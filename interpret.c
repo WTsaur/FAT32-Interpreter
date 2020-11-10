@@ -6,36 +6,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "BPB.h"
-
-typedef struct {
-    unsigned int* firstCluster;
-    int mode;
-    unsigned int offset;
-} __attribute__((packed)) file;
-
-typedef struct {
-    unsigned char DIR_name[11];
-    unsigned char DIR_Attributes;
-} __attribute__((packed)) DIRENTRY;
-
-/* opens a file in the cwd with the specified mode; init offset to 0;
- * print error if file is already open, does not exist, or invalid mode is used
- */
-void openFile(file* openFileList, char* file, char* mode);
-/* closes specified file, removing it from openFileList;
- * print error if file is not open or does not exist
- */
-void closeFile(file* openFileList, char* file);
+#include "DIRENTRY.h"
 
 void printInfo(BPB* bpbInfo);
-
-unsigned int littleEndianToInt(char* endian);
 
 int main(int argc, char* argv[]) {
     char *fatFile;
     char command[100] = "";
     int fatFD = -1;
-    file* openFileList;
     BPB bootSec;
 
     if (argc != 2) {
