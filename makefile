@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -g -std=c++11
 #List of dependencies (.h)
-DEPS =
+DEPS = BPB.h
 #List of object files (.o)
 OBJ = interpret.o
 
