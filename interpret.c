@@ -9,10 +9,22 @@
 #include "DIRENTRY.h"
 
 void printInfo(BPB* bpbInfo);
+void ls(unsigned int dirEntryOffset, int fatFD, BPB* bpbInfo);
+void cd(unsigned int dirEntryOffset, int fatFD, BPB* bpbInfo);
+
+typedef struct {
+	int size;
+	char** items;
+} tokenlist;
+
+tokenlist *new_tokenlist(void);
+tokenlist *get_tokens(char *input, char *delims);
+char *get_input(void);
+void add_token(tokenlist *tokens, char *item);
+void free_tokens(tokenlist *tokens);
 
 int main(int argc, char* argv[]) {
     char *fatFile;
-    char command[100] = "";
     int fatFD = -1;
     BPB bootSec;
 
@@ -35,16 +47,32 @@ int main(int argc, char* argv[]) {
     }
     memcpy(&bootSec, buf, sizeof(BPB));
 
+    //This stores the currrent directory. Intialize to root. (ReserveCount+(#Fat * FatSize)) * bytesPerSector
+    unsigned int currentClusterDirectory = (bootSec.RsvdSecCnt + (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
+
+
+
+    char *command = (char*) malloc(100);
+    command = " ";
     while (strcmp(command, "exit") != 0) {
         printf("$ ");
-        scanf("%s", command);
-        while ((getchar()) != '\n');
+		char *input = get_input();
+		tokenlist *tokens = get_tokens(input, " ");
+
+		if (tokens->size == 0) continue;
+
+        // char *arg = (char*) malloc(100);
+
+        // char* input = (char*) malloc(100);
+        // char** argList;
+        // const char* delim = " ";
+        command = tokens->items[0];
         if (strcmp(command, "info") == 0) {
             printInfo(&bootSec);
         } else if (strcmp(command, "size") == 0) {
             //size();
         } else if (strcmp(command, "ls") == 0) {
-            //ls();
+            ls(currentClusterDirectory, fatFD, &bootSec);
         } else if (strcmp(command, "cd") == 0) {
             //cd();
         } else if (strcmp(command, "creat") == 0) {
@@ -69,8 +97,6 @@ int main(int argc, char* argv[]) {
             //cp();
         } else if (strcmp(command, "rmdir") == 0) {
             //rmdir();
-        } else if (strcmp(command, "exit") == 0) {
-            //exit();
         } else {
             printf("invalid command: %s\n", command);      
         }
@@ -87,4 +113,105 @@ void printInfo(BPB* bpbInfo) {
     printf("Total Sectors: %i\n", (*bpbInfo).TotSec32);
     printf("FAT Size: %i\n", (*bpbInfo).FATSz32);
     printf("Root Cluster: 0x%.2X\n", (*bpbInfo).RootClus);
+}
+
+void ls(unsigned int currentClusterDirectory, int fatFD, BPB* bpbInfo){
+    //Lseek sets read pointer
+    lseek(fatFD,currentClusterDirectory, SEEK_SET);
+
+    DIRENTRY dirEntry;
+	for(int i=0; i*sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec; i++){
+
+    //Move Data to DirEntry
+    read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+    if(strlen(dirEntry.Name) > 0){
+        printf("%s\n", dirEntry.Name);
+             printf("Attr: %i\n", dirEntry.Attr);
+
+
+    }
+    // printf("Directory Offset %i\n", currentClusterDirectory);
+    // printf("Size: %i\n", dirEntry.FileSize);
+    }
+
+}
+
+void cd(unsigned int currentClusterDirectory, int fatFD, BPB* bpbInfo){
+    
+}
+
+tokenlist* new_tokenlist(void)
+{
+	tokenlist* tokens = (tokenlist*)malloc(sizeof(tokenlist));
+	tokens->size = 0;
+	tokens->items = NULL;
+	return tokens;
+}
+
+tokenlist *get_tokens(char *input, char* delims)
+{
+	char *buf = (char *) malloc(strlen(input) + 1);
+	strcpy(buf, input);
+
+	tokenlist *tokens = new_tokenlist();
+
+	char *tok = strtok(buf, delims);
+	while (tok != NULL) {
+		add_token(tokens, tok);
+		tok = strtok(NULL, delims);
+	}
+
+	tokens->items = (char**)realloc(tokens->items, (tokens->size + 1)*sizeof(char*));
+	tokens->items[tokens->size] = NULL;
+
+	free(buf);
+	return tokens;
+}
+
+char* get_input(void)
+{
+	char* buffer = NULL;
+	int bufsize = 0;
+
+	char line[5];
+	while (fgets(line, 5, stdin) != NULL) {
+		int addby = 0;
+		char* newln = strchr(line, '\n');
+		if (newln != NULL)
+			addby = newln - line;
+		else
+			addby = 5 - 1;
+
+		buffer = (char*)realloc(buffer, bufsize + addby);
+		memcpy(&buffer[bufsize], line, addby);
+		bufsize += addby;
+
+		if (newln != NULL)
+			break;
+	}
+
+	buffer = (char*)realloc(buffer, bufsize + 1);
+	buffer[bufsize] = 0;
+
+	return buffer;
+}
+
+void add_token(tokenlist *tokens, char *item)
+{
+    if (tokens != NULL) {
+        int i = tokens->size;
+	    tokens->items = (char **) realloc(tokens->items, (i + 1) * sizeof(char *));
+	    tokens->items[i] = (char *) malloc(strlen(item) + 1);
+        strcpy(tokens->items[i], item);
+	    tokens->size += 1;
+    }
+}
+
+void free_tokens(tokenlist* tokens)
+{
+	for (int i = 0; i < tokens->size; i++)
+		free(tokens->items[i]);
+
+	free(tokens);
 }
