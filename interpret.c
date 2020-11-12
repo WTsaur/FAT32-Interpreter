@@ -9,6 +9,7 @@
 #include "DIRENTRY.h"
 
 void printInfo(BPB* bpbInfo);
+void ls(unsigned int dirEntry, int fatFD, BPB* bpbInfo);
 
 int main(int argc, char* argv[]) {
     char *fatFile;
@@ -35,6 +36,12 @@ int main(int argc, char* argv[]) {
     }
     memcpy(&bootSec, buf, sizeof(BPB));
 
+    //This stores the currrent directory. Intialize to root. (ReserveCount+(#Fat * FatSize)) * bytesPerSector
+    unsigned int currentClusterDirectory = (bootSec.RsvdSecCnt + (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
+
+
+
+
     while (strcmp(command, "exit") != 0) {
         printf("$ ");
         scanf("%s", command);
@@ -44,7 +51,7 @@ int main(int argc, char* argv[]) {
         } else if (strcmp(command, "size") == 0) {
             //size();
         } else if (strcmp(command, "ls") == 0) {
-            //ls();
+            ls(currentClusterDirectory, fatFD, &bootSec);
         } else if (strcmp(command, "cd") == 0) {
             //cd();
         } else if (strcmp(command, "creat") == 0) {
@@ -69,8 +76,6 @@ int main(int argc, char* argv[]) {
             //cp();
         } else if (strcmp(command, "rmdir") == 0) {
             //rmdir();
-        } else if (strcmp(command, "exit") == 0) {
-            //exit();
         } else {
             printf("invalid command: %s\n", command);      
         }
@@ -87,4 +92,27 @@ void printInfo(BPB* bpbInfo) {
     printf("Total Sectors: %i\n", (*bpbInfo).TotSec32);
     printf("FAT Size: %i\n", (*bpbInfo).FATSz32);
     printf("Root Cluster: 0x%.2X\n", (*bpbInfo).RootClus);
+}
+
+void ls(unsigned int currentClusterDirectory, int fatFD, BPB* bpbInfo){
+    //Lseek sets read pointer
+    lseek(fatFD,currentClusterDirectory, SEEK_SET);
+
+    DIRENTRY dirEntry;
+	for(int i=0; i*sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec; i++){
+
+    //Move Data to DirEntry
+    read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+    if(strlen(dirEntry.Name) > 0){
+        printf("%s\n", dirEntry.Name);
+
+    }
+    // printf("Directory Offset %i\n", currentClusterDirectory);
+    // printf("Attr: %i\n", dirEntry.Attr);
+    // printf("Size: %i\n", dirEntry.FileSize);
+    }
+
+
+
 }
