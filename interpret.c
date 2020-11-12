@@ -10,7 +10,7 @@
 
 void printInfo(BPB *bpbInfo);
 void ls(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo);
-void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName), unsigned int& cluster;
+void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int& cluster);
 void trimStringRight(char *str);
 
 typedef struct
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     unsigned int currentCluster = bootSec.RootClus;
 
     //This stores the currrent directory. Intialize to root. (ReserveCount+(#Fat * FatSize)) * bytesPerSector
-    unsigned int currentDataSector = (bootSec.RsvdSecCnt + currentCluster - bootSec.RootClus (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
+    unsigned int currentDataSector = (bootSec.RsvdSecCnt + currentCluster - bootSec.RootClus + (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
 
     printf("%i\n", currentDataSector);
 
