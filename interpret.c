@@ -10,7 +10,7 @@
 
 void printInfo(BPB *bpbInfo);
 void ls(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo);
-void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName);
+void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName), unsigned int& cluster;
 void trimStringRight(char *str);
 
 typedef struct
@@ -53,9 +53,12 @@ int main(int argc, char *argv[])
     }
     memcpy(&bootSec, buf, sizeof(BPB));
 
+    unsigned int currentCluster = bootSec.RootClus;
+
     //This stores the currrent directory. Intialize to root. (ReserveCount+(#Fat * FatSize)) * bytesPerSector
-    unsigned int currentClusterDirectory = (bootSec.RsvdSecCnt + (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
-    printf("%i\n", currentClusterDirectory);
+    unsigned int currentDataSector = (bootSec.RsvdSecCnt + currentCluster - bootSec.RootClus (bootSec.NumFATs * bootSec.FATSz32)) * bootSec.BytesPerSec;
+
+    printf("%i\n", currentDataSector);
 
     char *command = (char *)malloc(100);
     command = " ";
@@ -78,7 +81,7 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "ls") == 0)
         {
-            ls(currentClusterDirectory, fatFD, &bootSec);
+            ls(currentDataSector, fatFD, &bootSec);
         }
         else if (strcmp(command, "cd") == 0)
         {
@@ -86,7 +89,7 @@ int main(int argc, char *argv[])
                 printf("Proved a path\n");
             else
             {
-                cd(currentClusterDirectory, fatFD, &bootSec, tokens->items[1]);
+                cd(currentDataSector, fatFD, &bootSec, tokens->items[1], currentCluster);
             }
 
             //cd();
@@ -155,14 +158,14 @@ void printInfo(BPB *bpbInfo)
     printf("Root Cluster: 0x%.2X\n", (*bpbInfo).RootClus);
 }
 
-void ls(unsigned int currentClusterDirectory, int fatFD, BPB *bpbInfo)
+void ls(unsigned int currentDataSector, int fatFD, BPB *bpbInfo)
 {
 
     //TODO: To allow for relative paths, a path will need to be passed in and parsed through. Once cd command is implemented use that to navigate path.
     // Make sure to keep copy of original path because we want our current cluster to not change
 
     //Lseek sets read pointer
-    lseek(fatFD, currentClusterDirectory, SEEK_SET);
+    lseek(fatFD, currentDataSector, SEEK_SET);
 
     DIRENTRY dirEntry;
     for (int i = 0; i * sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec; i++)
@@ -177,17 +180,17 @@ void ls(unsigned int currentClusterDirectory, int fatFD, BPB *bpbInfo)
             printf("%s", dirEntry.Name);
             printf("Type: %i\n", dirEntry.Attr);
         }
-        // printf("Directory Offset %i\n", currentClusterDirectory);
+        // printf("Directory Offset %i\n", currentDataSector);
         // printf("Size: %i\n", dirEntry.FileSize);
     }
 }
 
-void cd(unsigned int &currentClusterDirectory, int fatFD, BPB *bpbInfo, char *cdDirName)
+void cd(unsigned int &currentDataSector, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int& cluster)
 {
 
     int found = 0;
     //Lseek sets read pointer
-    lseek(fatFD, currentClusterDirectory, SEEK_SET);
+    lseek(fatFD, currentDataSector, SEEK_SET);
 
     DIRENTRY dirEntry;
     for (int i = 0; i * sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec; i++)
@@ -206,25 +209,25 @@ void cd(unsigned int &currentClusterDirectory, int fatFD, BPB *bpbInfo, char *cd
         {
             if (dirEntry.FstClusLO == 0 && dirEntry.FstClusHI == 0)
             {
-                currentClusterDirectory = ((*bpbInfo).RsvdSecCnt + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
+                currentDataSector = ((*bpbInfo).RsvdSecCnt + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
             }
             else
             {
-                unsigned int addr = 0x00000000;
-                addr |= dirEntry.FstClusHI << 16;
-                addr |= dirEntry.FstClusLO;
-                currentClusterDirectory = ((*bpbInfo).RsvdSecCnt + addr - 2 + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
+                cluster = 0x00000000;
+                cluster |= dirEntry.FstClusHI << 16;
+                cluster |= dirEntry.FstClusLO;
+                currentDataSector = ((*bpbInfo).RsvdSecCnt + cluster - (*bpbInfo).RootClus + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
             }
             return;
         }
 
         if (strcmp(dirEntry.Name, cdDirName) == 0 && dirEntry.Attr == 16)
         {
-            unsigned int addr = 0x00000000;
-            addr |= dirEntry.FstClusHI << 16;
-            addr |= dirEntry.FstClusLO;
+            cluster = 0x00000000;
+            cluster |= dirEntry.FstClusHI << 16;
+            cluster |= dirEntry.FstClusLO;
             found = 1;
-            currentClusterDirectory = ((*bpbInfo).RsvdSecCnt + addr - 2 + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
+            currentDataSector = ((*bpbInfo).RsvdSecCnt + cluster - 2 + ((*bpbInfo).NumFATs * (*bpbInfo).FATSz32)) * (*bpbInfo).BytesPerSec;
             return;
         }
     }
