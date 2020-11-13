@@ -11,6 +11,7 @@
 ## William Tsaur
 * implemented 'info'
 * implemented 'ls'
+* implemented 'cd'
 
 ## Michael Styron
 * 

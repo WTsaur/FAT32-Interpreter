@@ -9,7 +9,7 @@
 #include "DIRENTRY.h"
 
 static int fatFD;
-static unsigned int CurClus;
+static unsigned int CurClus; /* aka cluster number for current working directory */
 static BPB BootSec;
 static unsigned int CurDataSec;
 
@@ -20,10 +20,11 @@ typedef struct {
 
 void printInfo();
 void ls(tokenlist *tokens);
-//void cd(char *cdDirName);
+void cd(tokenlist *tokens);
 void trimStringRight(char *str);
-int HiLoClusConvert(unsigned short HI, unsigned short LO);
-int getDataSecForClus(int N);
+int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
+int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
+int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
 
 tokenlist *new_tokenlist(void);
 tokenlist *get_tokens(char *input, char *delims);
@@ -75,7 +76,10 @@ int main(int argc, char *argv[])
         char *command = tokens->items[0];
         if (strcmp(command, "info") == 0)
         {
-            printInfo();
+            if (tokens->size == 1)
+                printInfo();
+            else
+                printf("error: usage: info\n");
         }
         else if (strcmp(command, "size") == 0)
         {
@@ -83,17 +87,17 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "ls") == 0)
         {
-            ls(tokens);
+            if (tokens->size < 3)
+                ls(tokens);
+            else
+                printf("error: usage: ls <DIR NAME>\n");
         }
         else if (strcmp(command, "cd") == 0)
         {
-            if (tokens->size < 2)
-                printf("Proved a path\n");
+            if (tokens->size < 3)
+                cd(tokens);
             else
-            {
-                //cd(tokens->items[1]);
-            }
-            //cd();
+                printf("error: usage: cd <DIR NAME>\n");
         }
         else if (strcmp(command, "creat") == 0)
         {
@@ -168,48 +172,22 @@ void printInfo()
 
 void ls(tokenlist* tokens)
 {
-    //TODO: To allow for relative paths, a path will need to be passed in and parsed through. Once cd command is implemented use that to navigate path.
-    // Make sure to keep copy of original path because we want our current cluster to not change
-
-    unsigned int sector = CurDataSec;
-
+    unsigned int dataSec = CurDataSec;
     if (tokens->size > 1) {
         //search for directory matching DIRNAME
         char* dirname = tokens->items[1];
-        DIRENTRY dirEntry;
-        lseek(fatFD, sector, SEEK_SET);
-        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
-        {
-            //Move Data to DirEntry
-            read(fatFD, &dirEntry, sizeof(DIRENTRY));
-
-            //32 are files, 16 are folders
-            if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
-            {
-                if (strncmp(dirEntry.Name, dirname, strlen(dirname)) == 0)
-                {
-                    if (dirEntry.Attr == 16)
-                    {
-                        int clusNum = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-                        sector = getDataSecForClus(clusNum);
-                        break;
-                    }
-                    else
-                    {
-                        printf("error: %s is not a directory\n", dirname);
-                        return;
-                    }
-                }
-            }
-        }
-        if (sector == CurDataSec) {
-            printf("error: %s does not exist\n", dirname);
+        if (strcmp(dirname, ".") == 0) {
             return;
-        } 
+        }
+        int clusNum = searchForDirClusNum(dirname);
+        if (clusNum >= 0)
+            dataSec = getDataSecForClus(clusNum);
+        else
+            return;
     }
 
-    //Lseek sets read pointer
-    lseek(fatFD, sector, SEEK_SET);
+    //lseek sets read pointer
+    lseek(fatFD, dataSec, SEEK_SET);
 
     DIRENTRY dirEntry;
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
@@ -233,58 +211,26 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO) {
     int res = LO;
     if (HI != 0)
         res += (HI << 16);
+    if (res == 0)
+        res = BootSec.RootClus;
     return res;
 }
 
-// void cd(char *cdDirName, unsigned int& cluster)
-// {
-
-//     int found = 0;
-//     //Lseek sets read pointer
-//     lseek(fatFD, CurDataSec, SEEK_SET);
-
-//     DIRENTRY dirEntry;
-//     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
-//     {
-//         //Move Data to DirEntry
-//         read(fatFD, &dirEntry, sizeof(DIRENTRY));
-//         if (dirEntry.Attr == 16)
-//         {
-//             const char s[2] = " ";
-//             char *token;
-//             token = strtok(dirEntry.Name, s);
-//             strcpy(dirEntry.Name, token);
-//         }
-
-//         if (strcmp(dirEntry.Name, "..") == 0 && strcmp(cdDirName, "..") == 0)
-//         {
-//             if (dirEntry.FstClusLO == 0 && dirEntry.FstClusHI == 0)
-//             {
-//                 CurDataSec = (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
-//             }
-//             else
-//             {
-//                 cluster = 0x00000000;
-//                 cluster |= dirEntry.FstClusHI << 16;
-//                 cluster |= dirEntry.FstClusLO;
-//                 CurDataSec = (BootSec.RsvdSecCnt + cluster - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
-//             }
-//             return;
-//         }
-
-//         if (strcmp(dirEntry.Name, cdDirName) == 0 && dirEntry.Attr == 16)
-//         {
-//             cluster = 0x00000000;
-//             cluster |= dirEntry.FstClusHI << 16;
-//             cluster |= dirEntry.FstClusLO;
-//             found = 1;
-//             CurDataSec = (BootSec.RsvdSecCnt + cluster - 2 + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
-//             return;
-//         }
-//     }
-//     if (found != 1)
-//         printf("Directory Not Found\n");
-// }
+void cd(tokenlist *tokens) {
+    if (tokens->size > 1) {
+        //search for directory matching DIRNAME
+        char* dirname = tokens->items[1];
+        if (strcmp(dirname, ".") == 0) {
+            return;
+        }
+        
+        int clus = searchForDirClusNum(dirname);
+        if (clus >= 0) {
+            CurClus = searchForDirClusNum(dirname);
+            CurDataSec = getDataSecForClus(CurClus);
+        }
+    }
+}
 
 tokenlist *new_tokenlist(void)
 {
@@ -384,4 +330,33 @@ void trimStringRight(char *str)
 
 int getDataSecForClus(int N) {
     return (BootSec.RsvdSecCnt + N - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
+}
+
+int searchForDirClusNum(char* dirname) {
+    DIRENTRY dirEntry;
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        //Move Data to DirEntry
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+        //32 are files, 16 are folders
+        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
+        {
+            if (strncmp(dirEntry.Name, dirname, strlen(dirname)) == 0)
+            {
+                if (dirEntry.Attr == 16)
+                {
+                    return HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+                }
+                else
+                {
+                    printf("error: %s is not a directory\n", dirname);
+                    return -1;
+                }
+            }
+        }
+    }
+    printf("error: %s does not exist\n", dirname);
+    return -1;
 }
