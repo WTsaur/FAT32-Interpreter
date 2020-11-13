@@ -10,6 +10,7 @@
 
 ## William Tsaur
 * implemented 'info'
+* implemented 'ls'
 
 ## Michael Styron
 * 
