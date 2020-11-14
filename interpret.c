@@ -9,7 +9,7 @@
 #include "DIRENTRY.h"
 
 void printInfo(BPB *bpbInfo);
-int create(char* filename, bool isDirectory);
+int create(char *filename, bool isDirectory);
 
 void trimStringRight(char *str);
 char *padRight(char *string, int padded_len, char *pad);
@@ -19,7 +19,8 @@ static unsigned int CurClus; /* aka cluster number for current working directory
 static BPB BootSec;
 static unsigned int CurDataSec;
 
-typedef struct {
+typedef struct
+{
     int size;
     char **items;
 } tokenlist;
@@ -29,16 +30,16 @@ void ls(tokenlist *tokens);
 void cd(tokenlist *tokens);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
-int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
-int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
-int create(char* filename);
+int getDataSecForClus(int N);                              /* calculates the data sector for a given cluster, N */
+int searchForDirClusNum(char *dirname);                    /* searches cwd for dir and returns the cluster num for that dir */
+int create(char *filename);
 
 tokenlist *new_tokenlist(void);
 tokenlist *get_tokens(char *input, char *delims);
 char *get_input(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
-
+void createNewEntry(DIRENTRY &entry, bool isDirectory, unsigned int address, char *name); /*Creates empty DIRENTRY object of type file or directory*/
 int main(int argc, char *argv[])
 {
     char *fatFile;
@@ -58,7 +59,7 @@ int main(int argc, char *argv[])
 
     /* Retrieve BPB Info */
     unsigned char *buf;
-    buf = (unsigned char *) malloc(512);
+    buf = (unsigned char *)malloc(512);
     if (read(fatFD, buf, 512) == -1)
     {
         printf("error reading boot sector");
@@ -115,7 +116,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "mkdir") == 0)
         {
-            //mkdir();
+            if (tokens->size < 2)
+                printf("Proved a FIle Name\n");
+            else
+                create(tokens->items[1], true);
         }
         else if (strcmp(command, "mv") == 0)
         {
@@ -179,8 +183,13 @@ void printInfo()
     printf("FAT Size: %i\n", BootSec.FATSz32);
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
-int create(char* filename, bool isDirectory)
+int create(char *filename, bool isDirectory)
 {
+    if (strlen(filename) > 8)
+    {
+        printf("name must not exceed 8 Characters\n");
+        return -1;
+    }
     unsigned int FREE_CLUSTER = 0x00000000;
     unsigned int FAT_END = 0x0FFFFFF8;
 
@@ -189,12 +198,12 @@ int create(char* filename, bool isDirectory)
     //STEP 1 Find free fat entry
     int i = 0;
 
-
-	// sectors_per_cluster
-    unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec)  / BootSec.SecPerClus;
+    // sectors_per_cluster
+    unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec) / BootSec.SecPerClus;
     unsigned int fat_entry;
     unsigned int data_write_location;
     unsigned int fat_write_address;
+    unsigned int fat_cluster;
     while (i < cluster_count)
     {
         unsigned int offset = i * 4;
@@ -205,6 +214,7 @@ int create(char* filename, bool isDirectory)
         //printf("%i\n", fat_entry);
         if (fat_entry == FREE_CLUSTER)
         {
+            fat_cluster = i;
             break;
         }
         i++;
@@ -212,22 +222,10 @@ int create(char* filename, bool isDirectory)
 
     //STEP 2 WRITE NEW FAT END
     lseek(fatFD, fat_write_address, SEEK_SET);
-    write(fatFD, FAT_END, 4); //write new file end
+    write(fatFD, &FAT_END, 4); //write new file end
 
     //STEP 3 Create New Entry
-    const char* name = padRight(filename,11, ' ');
-    strcpy(dirEntry.Name, name);
-    dirEntry.Attr = 32;
-    dirEntry.NTRes = 0;
-    dirEntry.CrtTimeTenth = 0;
-    dirEntry.CrtTime = 0;
-    dirEntry.CrtDate = 0;
-    dirEntry.LstAccDate = 0;
-    dirEntry.FstClusHI = CurDataSec >> 16;;
-    dirEntry.WrtTime = 0;
-    dirEntry.WrtDate = 0;
-    dirEntry.FstClusLO = CurDataSec;
-    dirEntry.FileSize = 0;
+    createNewEntry(dirEntry, isDirectory, fat_cluster, filename);
 
     //STEP 4 WRITE FILE ENTRY at next open data address
     int found = 0;
@@ -243,30 +241,48 @@ int create(char* filename, bool isDirectory)
             if (testDir.Name[0] == 0x00 || testDir.Name[0] == 0xE5)
             {
                 data_write_location = CurDataSec + (j * 32);
-                printf("writing to %i\n", data_write_location);
                 found = 1;
                 break;
             }
         }
     }
-    if(found == 1){
+    if (found == 1)
+    {
         //Hopefully this works
         lseek(fatFD, data_write_location, SEEK_SET);
         write(fatFD, &dirEntry, sizeof(DIRENTRY));
     }
-    else{
+    else
+    {
         printf("Directory Full\n");
+        return -1;
     }
 
+    if (isDirectory)
+    {
+        DIRENTRY dotDirectory;
+        DIRENTRY dot2Directory;
+        unsigned int new_loc = getDataSecForClus(fat_cluster);
+        createNewEntry(dot2Directory, isDirectory, CurClus, "..");
+        createNewEntry(dotDirectory, isDirectory, fat_cluster, ".");
+
+        lseek(fatFD, new_loc, SEEK_SET);
+        write(fatFD, &dotDirectory, sizeof(DIRENTRY));
+
+        lseek(fatFD, new_loc + 32, SEEK_SET);
+        write(fatFD, &dot2Directory, sizeof(DIRENTRY));
+    }
 }
 
-void ls(tokenlist* tokens)
+void ls(tokenlist *tokens)
 {
     unsigned int dataSec = CurDataSec;
-    if (tokens->size > 1) {
+    if (tokens->size > 1)
+    {
         //search for directory matching DIRNAME
-        char* dirname = tokens->items[1];
-        if (strcmp(dirname, ".") == 0) {
+        char *dirname = tokens->items[1];
+        if (strcmp(dirname, ".") == 0)
+        {
             return;
         }
         int clusNum = searchForDirClusNum(dirname);
@@ -290,14 +306,15 @@ void ls(tokenlist* tokens)
         if (strlen(dirEntry.Name) > 0 && (dirEntry.Attr == 32 || dirEntry.Attr == 16))
         {
             printf("%s\n", dirEntry.Name);
-            // printf("Type: %i\n", dirEntry.Attr);
+            //printf("Type: %i\n", dirEntry.Attr);
         }
         // printf("Directory Offset %i\n", CurDataSec);
         // printf("Size: %i\n", dirEntry.FileSize);
     }
 }
 
-int HiLoClusConvert(unsigned short HI, unsigned short LO) {
+int HiLoClusConvert(unsigned short HI, unsigned short LO)
+{
     int res = LO;
     if (HI != 0)
         res += (HI << 16);
@@ -306,18 +323,23 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO) {
     return res;
 }
 
-void cd(tokenlist *tokens) {
-    if (tokens->size > 1) {
+void cd(tokenlist *tokens)
+{
+    if (tokens->size > 1)
+    {
         //search for directory matching DIRNAME
-        char* dirname = tokens->items[1];
-        if (strcmp(dirname, ".") == 0) {
+        char *dirname = tokens->items[1];
+        if (strcmp(dirname, ".") == 0)
+        {
             return;
         }
-        
+
         int clus = searchForDirClusNum(dirname);
-        if (clus >= 0) {
+        if (clus >= 0)
+        {
             CurClus = searchForDirClusNum(dirname);
             CurDataSec = getDataSecForClus(CurClus);
+
         }
     }
 }
@@ -418,23 +440,25 @@ void trimStringRight(char *str)
     str[index + 1] = '\0';
 }
 
-char *padRight(char *string, int padded_len, char *pad) {
-    char* z  = " ";     //one ASCII zero
-    char* str = (char*)malloc(padded_len * sizeof(char) + 1);
- 
+char *padRight(char *string, int padded_len, char *pad)
+{
+    char *z = " ";
+    char *str = (char *)malloc(padded_len * sizeof(char) + 1);
+
     strcpy(str, string);
     while (strlen(str) < padded_len)
     {
         strcat(str, z);
- 
     }
     return str;
 }
-int getDataSecForClus(int N) {
+int getDataSecForClus(int N)
+{
     return (BootSec.RsvdSecCnt + N - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
 }
 
-int searchForDirClusNum(char* dirname) {
+int searchForDirClusNum(char *dirname)
+{
     DIRENTRY dirEntry;
     lseek(fatFD, CurDataSec, SEEK_SET);
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
@@ -461,4 +485,24 @@ int searchForDirClusNum(char* dirname) {
     }
     printf("error: %s does not exist\n", dirname);
     return -1;
+}
+
+void createNewEntry(DIRENTRY &entry, bool isDirectory, unsigned int address, char *filename)
+{
+    const char *name = padRight(filename, 8, ' ');
+    strcpy(entry.Name, name);
+    if (isDirectory)
+        entry.Attr = 16;
+    else
+        entry.Attr = 32;
+    entry.NTRes = 0;
+    entry.CrtTimeTenth = 0;
+    entry.CrtTime = 0;
+    entry.CrtDate = 0;
+    entry.LstAccDate = 0;
+    entry.FstClusHI = address >> 16;
+    entry.WrtTime = 0;
+    entry.WrtDate = 0;
+    entry.FstClusLO = address;
+    entry.FileSize = 0;
 }
