@@ -1,7 +1,7 @@
 #ifndef DIRENTRY_H
 #define DIRENTRY_H
 
-struct DIRENTRY_struct {
+typedef struct {
     char Name[11];
     unsigned char Attr;
     unsigned char NTRes;
@@ -14,8 +14,6 @@ struct DIRENTRY_struct {
     unsigned short WrtDate;
     unsigned short FstClusLO;
     unsigned int FileSize;
-} __attribute((packed));
-
-typedef DIRENTRY_struct DIRENTRY;
+} __attribute((packed)) DIRENTRY;
 
 #endif
