@@ -5,10 +5,17 @@
 # Contributions By Member
 
 ## Nicholas Tidwell
+* makefile
 * implemented 'ls'
 * implemented 'cd'
+* implemented 'creat'
+* implemented 'mkdir'
 
 ## William Tsaur
+* README.md
+* DIRENTRY.h
+* BPB.h
+* makefile
 * implemented 'info'
 * implemented 'ls'
 * implemented 'cd'
