@@ -8,9 +8,6 @@
 #include "BPB.h"
 #include "DIRENTRY.h"
 
-void printInfo(BPB *bpbInfo);
-int create(char* filename, bool isDirectory);
-
 void trimStringRight(char *str);
 char *padRight(char *string, int padded_len, char *pad);
 
@@ -32,7 +29,7 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY'
 int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
 int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
 int searchForDirClusNum_H(tokenlist* dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
-int create(char* filename);
+int create(char* filename, int isDirectory);
 
 tokenlist *new_tokenlist(void);
 tokenlist *get_tokens(char *input, char *delims);
@@ -112,7 +109,7 @@ int main(int argc, char *argv[])
             if (tokens->size < 2)
                 printf("Proved a FIle Name\n");
             else
-                create(tokens->items[1], false);
+                create(tokens->items[1], 0);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
@@ -180,7 +177,7 @@ void printInfo()
     printf("FAT Size: %i\n", BootSec.FATSz32);
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
-int create(char* filename, bool isDirectory)
+int create(char* filename, int isDirectory)
 {
     unsigned int FREE_CLUSTER = 0x00000000;
     unsigned int FAT_END = 0x0FFFFFF8;
