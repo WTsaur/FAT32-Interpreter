@@ -9,7 +9,7 @@
 #include "DIRENTRY.h"
 
 void printInfo(BPB *bpbInfo);
-int create(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo, unsigned int cluster, char* filename);
+int create(char* filename, bool isDirectory);
 
 void trimStringRight(char *str);
 char *padRight(char *string, int padded_len, char *pad);
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
             if (tokens->size < 2)
                 printf("Proved a FIle Name\n");
             else
-                create(currentDataSector, fatFD, &bootSec, currentCluster, tokens->items[1]);
+                create(tokens->items[1], false);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
@@ -178,7 +178,7 @@ void printInfo()
     printf("FAT Size: %i\n", BootSec.FATSz32);
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
-int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int cluster, char* filename)
+int create(char* filename, bool isDirectory)
 {
     unsigned int FREE_CLUSTER = 0x00000000;
     unsigned int FAT_END = 0x0FFFFFF8;
@@ -197,8 +197,8 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     while (i < cluster_count)
     {
         unsigned int offset = i * 4;
-        unsigned int sectionNum = (offset / (*bpbInfo).BytesPerSec) + (*bpbInfo).RsvdSecCnt;
-        fat_write_address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
+        unsigned int sectionNum = (offset / BootSec.BytesPerSec) + BootSec.RsvdSecCnt;
+        fat_write_address = sectionNum * BootSec.BytesPerSec + (offset % BootSec.BytesPerSec);
         lseek(fatFD, fat_write_address, SEEK_SET);
         read(fatFD, &fat_entry, sizeof(fat_entry));
         //printf("%i\n", fat_entry);
@@ -216,32 +216,32 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     //STEP 3 Create New Entry
     const char* name = padRight(filename,11, ' ');
     strcpy(dirEntry.Name, name);
-    dirEntry.Attr = 16;
+    dirEntry.Attr = 32;
     dirEntry.NTRes = 0;
     dirEntry.CrtTimeTenth = 0;
     dirEntry.CrtTime = 0;
     dirEntry.CrtDate = 0;
     dirEntry.LstAccDate = 0;
-    dirEntry.FstClusHI = working_cluster >> 16;;
+    dirEntry.FstClusHI = CurDataSec >> 16;;
     dirEntry.WrtTime = 0;
     dirEntry.WrtDate = 0;
-    dirEntry.FstClusLO = working_cluster;
+    dirEntry.FstClusLO = CurDataSec;
     dirEntry.FileSize = 0;
 
     //STEP 4 WRITE FILE ENTRY at next open data address
     int found = 0;
     //Probably should check to make sure sector isn't full first
-    for (int i = 0; i * sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec && found == 0; i++)
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec && found == 0; i++)
     {
         for (int j = 0; j < 16; j += 2)
         {
 
             //Need to read and check if empty
-            lseek(fatFD, working_cluster + (j * 32), SEEK_SET);
+            lseek(fatFD, CurDataSec + (j * 32), SEEK_SET);
             read(fatFD, &testDir, sizeof(DIRENTRY));
             if (testDir.Name[0] == 0x00 || testDir.Name[0] == 0xE5)
             {
-                data_write_location = working_cluster + (j * 32);
+                data_write_location = CurDataSec + (j * 32);
                 printf("writing to %i\n", data_write_location);
                 found = 1;
                 break;
