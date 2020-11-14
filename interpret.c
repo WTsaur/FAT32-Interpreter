@@ -187,15 +187,19 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     DIRENTRY testDir;
     //STEP 1 Find free fat entry
     int i = 0;
-    unsigned int cluster_count = 1000; //I Just set this randomly, we should probably figure out the cluster actual count
+
+
+	// sectors_per_cluster
+    unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec)  / BootSec.SecPerClus;
     unsigned int fat_entry;
-    unsigned int writeLocation;
+    unsigned int data_write_location;
+    unsigned int fat_write_address;
     while (i < cluster_count)
     {
         unsigned int offset = i * 4;
         unsigned int sectionNum = (offset / (*bpbInfo).BytesPerSec) + (*bpbInfo).RsvdSecCnt;
-        unsigned int address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
-        lseek(fatFD, address, SEEK_SET);
+        fat_write_address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
+        lseek(fatFD, fat_write_address, SEEK_SET);
         read(fatFD, &fat_entry, sizeof(fat_entry));
         //printf("%i\n", fat_entry);
         if (fat_entry == FREE_CLUSTER)
@@ -205,12 +209,8 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
         i++;
     }
 
-    //i is the next free cluster
     //STEP 2 WRITE NEW FAT END
-    unsigned int offset = i * 4;
-    unsigned int sectionNum = (offset / (*bpbInfo).BytesPerSec) + (*bpbInfo).RsvdSecCnt;
-    unsigned int address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
-    lseek(fatFD, address, SEEK_SET);
+    lseek(fatFD, fat_write_address, SEEK_SET);
     write(fatFD, FAT_END, 4); //write new file end
 
     //STEP 3 Create New Entry
@@ -222,12 +222,13 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     dirEntry.CrtTime = 0;
     dirEntry.CrtDate = 0;
     dirEntry.LstAccDate = 0;
-    dirEntry.FstClusHI = 0;
+    dirEntry.FstClusHI = working_cluster >> 16;;
     dirEntry.WrtTime = 0;
     dirEntry.WrtDate = 0;
-    dirEntry.FstClusLO = address;
-    dirEntry.FileSize = address >> 16;
-    //STEP 4 WRITE FILE ENTRY
+    dirEntry.FstClusLO = working_cluster;
+    dirEntry.FileSize = 0;
+
+    //STEP 4 WRITE FILE ENTRY at next open data address
     int found = 0;
     //Probably should check to make sure sector isn't full first
     for (int i = 0; i * sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec && found == 0; i++)
@@ -236,14 +237,12 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
         {
 
             //Need to read and check if empty
-            offset *= 32;
-            unsigned int dataAddress = working_cluster;
-            lseek(fatFD, dataAddress + (j * 32), SEEK_SET);
+            lseek(fatFD, working_cluster + (j * 32), SEEK_SET);
             read(fatFD, &testDir, sizeof(DIRENTRY));
             if (testDir.Name[0] == 0x00 || testDir.Name[0] == 0xE5)
             {
-                writeLocation = working_cluster + (j * 32);
-                printf("writing to %i\n", writeLocation);
+                data_write_location = working_cluster + (j * 32);
+                printf("writing to %i\n", data_write_location);
                 found = 1;
                 break;
             }
@@ -251,7 +250,7 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     }
     if(found == 1){
         //Hopefully this works
-        lseek(fatFD, writeLocation, SEEK_SET);
+        lseek(fatFD, data_write_location, SEEK_SET);
         write(fatFD, &dirEntry, sizeof(DIRENTRY));
     }
     else{
