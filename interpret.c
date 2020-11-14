@@ -11,8 +11,12 @@
 void printInfo(BPB *bpbInfo);
 void ls(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo);
 void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int &cluster);
+int create(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo, unsigned int cluster, char* filename);
+
 void trimStringRight(char *str);
-int create(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo, unsigned int cluster);
+char *padRight(char *string, int padded_len, char *pad);
+
+
 typedef struct
 {
     int size;
@@ -96,7 +100,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "creat") == 0)
         {
-            create(currentDataSector, fatFD, &bootSec, currentCluster);
+            if (tokens->size < 2)
+                printf("Proved a FIle Name\n");
+            else
+                create(currentDataSector, fatFD, &bootSec, currentCluster, tokens->items[1]);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
@@ -157,7 +164,7 @@ void printInfo(BPB *bpbInfo)
     printf("FAT Size: %i\n", (*bpbInfo).FATSz32);
     printf("Root Cluster: 0x%.2X\n", (*bpbInfo).RootClus);
 }
-int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int cluster)
+int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int cluster, char* filename)
 {
     unsigned int FREE_CLUSTER = 0x00000000;
     unsigned int FAT_END = 0x0FFFFFF8;
@@ -193,7 +200,7 @@ int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int c
     write(fatFD, FAT_END, 4); //write new file end
 
     //STEP 3 Create New Entry
-    const char* name = "Name      ";
+    const char* name = padRight(filename,11, ' ');
     strcpy(dirEntry.Name, name);
     dirEntry.Attr = 16;
     dirEntry.NTRes = 0;
@@ -410,4 +417,17 @@ void trimStringRight(char *str)
         i++;
     }
     str[index + 1] = '\0';
+}
+
+char *padRight(char *string, int padded_len, char *pad) {
+    char* z  = " ";     //one ASCII zero
+    char* str = (char*)malloc(padded_len * sizeof(char) + 1);
+ 
+    strcpy(str, string);
+    while (strlen(str) < padded_len)
+    {
+        strcat(str, z);
+ 
+    }
+    return str;
 }
