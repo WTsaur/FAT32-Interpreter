@@ -10,9 +10,9 @@
 
 void printInfo(BPB *bpbInfo);
 void ls(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo);
-void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int& cluster);
+void cd(unsigned int &dirEntryOffset, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int &cluster);
 void trimStringRight(char *str);
-
+int create(unsigned int dirEntryOffset, int fatFD, BPB *bpbInfo, unsigned int cluster);
 typedef struct
 {
     int size;
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "creat") == 0)
         {
-            //creat();
+            create(currentDataSector, fatFD, &bootSec, currentCluster);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
@@ -157,6 +157,87 @@ void printInfo(BPB *bpbInfo)
     printf("FAT Size: %i\n", (*bpbInfo).FATSz32);
     printf("Root Cluster: 0x%.2X\n", (*bpbInfo).RootClus);
 }
+int create(unsigned int working_cluster, int fatFD, BPB *bpbInfo, unsigned int cluster)
+{
+    unsigned int FREE_CLUSTER = 0x00000000;
+    unsigned int FAT_END = 0x0FFFFFF8;
+
+    DIRENTRY dirEntry;
+    DIRENTRY testDir;
+    //STEP 1 Find free fat entry
+    int i = 0;
+    unsigned int cluster_count = 1000; //I Just set this randomly, we should probably figure out the cluster actual count
+    unsigned int fat_entry;
+    unsigned int writeLocation;
+    while (i < cluster_count)
+    {
+        unsigned int offset = i * 4;
+        unsigned int sectionNum = (offset / (*bpbInfo).BytesPerSec) + (*bpbInfo).RsvdSecCnt;
+        unsigned int address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
+        lseek(fatFD, address, SEEK_SET);
+        read(fatFD, &fat_entry, sizeof(fat_entry));
+        //printf("%i\n", fat_entry);
+        if (fat_entry == FREE_CLUSTER)
+        {
+            break;
+        }
+        i++;
+    }
+
+    //i is the next free cluster
+    //STEP 2 WRITE NEW FAT END
+    unsigned int offset = i * 4;
+    unsigned int sectionNum = (offset / (*bpbInfo).BytesPerSec) + (*bpbInfo).RsvdSecCnt;
+    unsigned int address = sectionNum * (*bpbInfo).BytesPerSec + (offset % (*bpbInfo).BytesPerSec);
+    lseek(fatFD, address, SEEK_SET);
+    write(fatFD, FAT_END, 4); //write new file end
+
+    //STEP 3 Create New Entry
+    const char* name = "Name      ";
+    strcpy(dirEntry.Name, name);
+    dirEntry.Attr = 16;
+    dirEntry.NTRes = 0;
+    dirEntry.CrtTimeTenth = 0;
+    dirEntry.CrtTime = 0;
+    dirEntry.CrtDate = 0;
+    dirEntry.LstAccDate = 0;
+    dirEntry.FstClusHI = 0;
+    dirEntry.WrtTime = 0;
+    dirEntry.WrtDate = 0;
+    dirEntry.FstClusLO = address;
+    dirEntry.FileSize = address >> 16;
+    //STEP 4 WRITE FILE ENTRY
+    int found = 0;
+    //Probably should check to make sure sector isn't full first
+    for (int i = 0; i * sizeof(DIRENTRY) < (*bpbInfo).BytesPerSec && found == 0; i++)
+    {
+        for (int j = 0; j < 16; j += 2)
+        {
+
+            //Need to read and check if empty
+            offset *= 32;
+            unsigned int dataAddress = working_cluster;
+            lseek(fatFD, dataAddress + (j * 32), SEEK_SET);
+            read(fatFD, &testDir, sizeof(DIRENTRY));
+            if (testDir.Name[0] == 0x00 || testDir.Name[0] == 0xE5)
+            {
+                writeLocation = working_cluster + (j * 32);
+                printf("writing to %i\n", writeLocation);
+                found = 1;
+                break;
+            }
+        }
+    }
+    if(found == 1){
+        //Hopefully this works
+        lseek(fatFD, writeLocation, SEEK_SET);
+        write(fatFD, &dirEntry, sizeof(DIRENTRY));
+    }
+    else{
+        printf("Directory Full\n");
+    }
+
+}
 
 void ls(unsigned int currentDataSector, int fatFD, BPB *bpbInfo)
 {
@@ -185,7 +266,7 @@ void ls(unsigned int currentDataSector, int fatFD, BPB *bpbInfo)
     }
 }
 
-void cd(unsigned int &currentDataSector, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int& cluster)
+void cd(unsigned int &currentDataSector, int fatFD, BPB *bpbInfo, char *cdDirName, unsigned int &cluster)
 {
 
     int found = 0;

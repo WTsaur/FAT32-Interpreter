@@ -2,7 +2,7 @@
 #define DIRENTRY_H
 
 struct DIRENTRY_struct {
-    unsigned char Name[11];
+    char Name[11];
     unsigned char Attr;
     unsigned char NTRes;
     unsigned char CrtTimeTenth;
