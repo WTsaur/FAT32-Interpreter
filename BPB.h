@@ -1,7 +1,7 @@
 #ifndef BPB_H
 #define BPB_H
 
-struct BPB_struct {
+typedef struct {
     unsigned char BS_jmpBoot[3];
     unsigned char BS_OEMName[8];
     unsigned short BytesPerSec;
@@ -31,8 +31,6 @@ struct BPB_struct {
     unsigned char FilSysType[8];
     unsigned char CodeReserved[420];
     unsigned short Signature_word;
-}__attribute((packed));
-
-typedef BPB_struct BPB;
+}__attribute((packed)) BPB;
 
 #endif
