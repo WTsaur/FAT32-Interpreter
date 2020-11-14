@@ -8,6 +8,9 @@
 #include "BPB.h"
 #include "DIRENTRY.h"
 
+void printInfo(BPB *bpbInfo);
+int create(char* filename, bool isDirectory);
+
 void trimStringRight(char *str);
 char *padRight(char *string, int padded_len, char *pad);
 
@@ -109,7 +112,7 @@ int main(int argc, char *argv[])
             if (tokens->size < 2)
                 printf("Proved a FIle Name\n");
             else
-                create(tokens->items[1]);
+                create(tokens->items[1], false);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
@@ -177,7 +180,7 @@ void printInfo()
     printf("FAT Size: %i\n", BootSec.FATSz32);
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
-int create(char* filename)
+int create(char* filename, bool isDirectory)
 {
     unsigned int FREE_CLUSTER = 0x00000000;
     unsigned int FAT_END = 0x0FFFFFF8;
@@ -215,7 +218,7 @@ int create(char* filename)
     //STEP 3 Create New Entry
     const char* name = padRight(filename,11, ' ');
     strcpy(dirEntry.Name, name);
-    dirEntry.Attr = 16;
+    dirEntry.Attr = 32;
     dirEntry.NTRes = 0;
     dirEntry.CrtTimeTenth = 0;
     dirEntry.CrtTime = 0;
