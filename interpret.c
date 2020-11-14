@@ -28,6 +28,7 @@ void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
 int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
+int searchForDirClusNum_H(tokenlist* dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
 int create(char* filename);
 
 tokenlist *new_tokenlist(void);
@@ -263,14 +264,13 @@ void ls(tokenlist* tokens)
     if (tokens->size > 1) {
         //search for directory matching DIRNAME
         char* dirname = tokens->items[1];
-        if (strcmp(dirname, ".") == 0) {
-            return;
+        if (strcmp(dirname, ".") != 0) {
+            int clusNum = searchForDirClusNum(dirname);
+            if (clusNum >= 0)
+                dataSec = getDataSecForClus(clusNum);
+            else
+                return;
         }
-        int clusNum = searchForDirClusNum(dirname);
-        if (clusNum >= 0)
-            dataSec = getDataSecForClus(clusNum);
-        else
-            return;
     }
 
     //lseek sets read pointer
@@ -432,30 +432,43 @@ int getDataSecForClus(int N) {
 }
 
 int searchForDirClusNum(char* dirname) {
-    DIRENTRY dirEntry;
-    lseek(fatFD, CurDataSec, SEEK_SET);
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
-    {
-        //Move Data to DirEntry
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+    tokenlist* dirTokens = get_tokens(dirname, "/");
+    return searchForDirClusNum_H(dirTokens, 0, CurClus);
+}
 
-        //32 are files, 16 are folders
-        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
+int searchForDirClusNum_H(tokenlist* dirTokens, int curIdx, int cluster) {
+    if (curIdx >= dirTokens->size) {
+        return cluster;
+    } else {
+        char* dirname = dirTokens->items[curIdx];
+        DIRENTRY dirEntry;
+        int nextClus;
+        int dataSec = getDataSecForClus(cluster);
+        lseek(fatFD, dataSec, SEEK_SET);
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            if (strncmp(dirEntry.Name, dirname, strlen(dirname)) == 0)
+            //Move Data to DirEntry
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+            //32 are files, 16 are folders
+            if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
             {
-                if (dirEntry.Attr == 16)
+                if (strncmp(dirEntry.Name, dirname, strlen(dirname)) == 0)
                 {
-                    return HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-                }
-                else
-                {
-                    printf("error: %s is not a directory\n", dirname);
-                    return -1;
+                    if (dirEntry.Attr == 16)
+                    {
+                        nextClus = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+                        return searchForDirClusNum_H(dirTokens, ++curIdx, nextClus);
+                    }
+                    else
+                    {
+                        printf("error: %s is not a directory\n", dirname);
+                        return -1;
+                    }
                 }
             }
         }
+        printf("error: %s does not exist\n", dirname);
+        return -1;
     }
-    printf("error: %s does not exist\n", dirname);
-    return -1;
 }
