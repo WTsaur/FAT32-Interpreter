@@ -31,6 +31,7 @@ void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
 int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
+int create(char* filename);
 
 tokenlist *new_tokenlist(void);
 tokenlist *get_tokens(char *input, char *delims);
