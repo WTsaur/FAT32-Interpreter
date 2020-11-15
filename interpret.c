@@ -38,6 +38,7 @@ void cd(tokenlist *tokens);
 void rm(char *filename);
 void open(tokenlist *tokens);
 void close(tokenlist *tokens);
+void lseek(tokenlist *tokens);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
@@ -162,7 +163,14 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "lseek") == 0)
         {
-            //lseek();
+            if (tokens->size != 3)
+            {
+                printf("error: usage: lseek <FILE NAME> <OFFSET>\n");
+            }
+            else
+            {
+                lseek(tokens);
+            }
         }
         else if (strcmp(command, "read") == 0)
         {
@@ -704,7 +712,6 @@ void open(tokenlist *tokens)
 void close(tokenlist *tokens)
 {
     DIRENTRY dirEntry;
-    int found = 0;
     char *filename = tokens->items[1];
     int dataSec = getDataSecForClus(CurClus);
     lseek(fatFD, dataSec, SEEK_SET);
@@ -726,7 +733,39 @@ void close(tokenlist *tokens)
                     //Again this will not work will files opening and closing out of order, we need a link list, Check note in file open
                     openFilelist[fileListSize] = nullFileEntry;
                     fileListSize--;
-                    found = 1;
+                    return;
+                }
+            }
+        }
+    }
+    printf("File Not Open\n");
+}
+
+void lseek(tokenlist *tokens)
+{
+    DIRENTRY dirEntry;
+    char *filename = tokens->items[1];
+    int offset = atoi(tokens->items[2]);
+    int dataSec = getDataSecForClus(CurClus);
+    lseek(fatFD, dataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        {
+            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+            for (int j = 0; j < fileListSize; j++)
+            {
+                if (openFilelist->first_cluster == cluster_num)
+                {
+
+                    //Again this will not work will files opening and closing out of order, we need a link list, Check note in file open
+                    if (offset > dirEntry.FileSize)
+                    {
+                        printf("Offset larger then file size\n");
+                        return;
+                    }
+                    openFilelist[fileListSize].offset = offset;
                     return;
                 }
             }
