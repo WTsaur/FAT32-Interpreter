@@ -16,7 +16,8 @@ static unsigned int CurClus; /* aka cluster number for current working directory
 static BPB BootSec;
 static unsigned int CurDataSec;
 
-typedef struct {
+typedef struct
+{
     int size;
     char **items;
 } tokenlist;
@@ -24,12 +25,14 @@ typedef struct {
 void printInfo();
 void ls(tokenlist *tokens);
 void cd(tokenlist *tokens);
+void rm(char *filename);
 void trimStringRight(char *str);
-int HiLoClusConvert(unsigned short HI, unsigned short LO); /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
-int getDataSecForClus(int N); /* calculates the data sector for a given cluster, N */
-int searchForDirClusNum(char* dirname); /* searches cwd for dir and returns the cluster num for that dir */
-int searchForDirClusNum_H(tokenlist* dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
-int create(char* filename, int isDirectory);
+int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
+int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
+int searchForDirClusNum(char *dirname);                                   /* searches cwd for dir and returns the cluster num for that dir */
+int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
+unsigned int clusterToFatAddress(unsigned int clusterNum);                /*  Takes cluster number and returns fat address*/
+int create(char *filename, int isDirectory);
 void createNewEntry(DIRENTRY *entry, int isDirectory, unsigned int address, char *name); /*Creates empty DIRENTRY object of type file or directory*/
 
 tokenlist *new_tokenlist(void);
@@ -57,7 +60,7 @@ int main(int argc, char *argv[])
 
     /* Retrieve BPB Info */
     unsigned char *buf;
-    buf = (unsigned char *) malloc(512);
+    buf = (unsigned char *)malloc(512);
     if (read(fatFD, buf, 512) == -1)
     {
         printf("error reading boot sector");
@@ -145,7 +148,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "rm") == 0)
         {
-            //rm();
+            if (tokens->size < 2)
+                printf("error: usage: mkdir <DIR NAME>\n");
+            else
+                rm(tokens->items[1]);
         }
         else if (strcmp(command, "cp") == 0)
         {
@@ -205,12 +211,10 @@ int create(char *filename, int isDirectory)
     unsigned int fat_cluster;
     while (i < cluster_count)
     {
-        unsigned int offset = i * 4;
-        unsigned int sectionNum = (offset / BootSec.BytesPerSec) + BootSec.RsvdSecCnt;
-        fat_write_address = sectionNum * BootSec.BytesPerSec + (offset % BootSec.BytesPerSec);
+
+        fat_write_address = clusterToFatAddress(i);
         lseek(fatFD, fat_write_address, SEEK_SET);
         read(fatFD, &fat_entry, sizeof(fat_entry));
-        //printf("%i\n", fat_entry);
         if (fat_entry == FREE_CLUSTER)
         {
             fat_cluster = i;
@@ -273,13 +277,15 @@ int create(char *filename, int isDirectory)
     }
 }
 
-void ls(tokenlist* tokens)
+void ls(tokenlist *tokens)
 {
     unsigned int dataSec = CurDataSec;
-    if (tokens->size > 1) {
+    if (tokens->size > 1)
+    {
         //search for directory matching DIRNAME
-        char* dirname = tokens->items[1];
-        if (strcmp(dirname, ".") != 0) {
+        char *dirname = tokens->items[1];
+        if (strcmp(dirname, ".") != 0)
+        {
             int clusNum = searchForDirClusNum(dirname);
             if (clusNum >= 0)
                 dataSec = getDataSecForClus(clusNum);
@@ -309,7 +315,8 @@ void ls(tokenlist* tokens)
     }
 }
 
-int HiLoClusConvert(unsigned short HI, unsigned short LO) {
+int HiLoClusConvert(unsigned short HI, unsigned short LO)
+{
     int res = LO;
     if (HI != 0)
         res += (HI << 16);
@@ -318,16 +325,20 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO) {
     return res;
 }
 
-void cd(tokenlist *tokens) {
-    if (tokens->size > 1) {
+void cd(tokenlist *tokens)
+{
+    if (tokens->size > 1)
+    {
         //search for directory matching DIRNAME
-        char* dirname = tokens->items[1];
-        if (strcmp(dirname, ".") == 0) {
+        char *dirname = tokens->items[1];
+        if (strcmp(dirname, ".") == 0)
+        {
             return;
         }
-        
+
         int clus = searchForDirClusNum(dirname);
-        if (clus >= 0) {
+        if (clus >= 0)
+        {
             CurClus = searchForDirClusNum(dirname);
             CurDataSec = getDataSecForClus(CurClus);
         }
@@ -430,32 +441,38 @@ void trimStringRight(char *str)
     str[index + 1] = '\0';
 }
 
-char *padRight(char *string, int padded_len, char *pad) {
-    char* z  = " ";     //one ASCII zero
-    char* str = (char*)malloc(padded_len * sizeof(char) + 1);
- 
+char *padRight(char *string, int padded_len, char *pad)
+{
+    char *z = " "; //one ASCII zero
+    char *str = (char *)malloc(padded_len * sizeof(char) + 1);
+
     strcpy(str, string);
     while (strlen(str) < padded_len)
     {
         strcat(str, z);
- 
     }
     return str;
 }
-int getDataSecForClus(int N) {
+int getDataSecForClus(int N)
+{
     return (BootSec.RsvdSecCnt + N - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
 }
 
-int searchForDirClusNum(char* dirname) {
-    tokenlist* dirTokens = get_tokens(dirname, "/");
+int searchForDirClusNum(char *dirname)
+{
+    tokenlist *dirTokens = get_tokens(dirname, "/");
     return searchForDirClusNum_H(dirTokens, 0, CurClus);
 }
 
-int searchForDirClusNum_H(tokenlist* dirTokens, int curIdx, int cluster) {
-    if (curIdx >= dirTokens->size) {
+int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster)
+{
+    if (curIdx >= dirTokens->size)
+    {
         return cluster;
-    } else {
-        char* dirname = dirTokens->items[curIdx];
+    }
+    else
+    {
+        char *dirname = dirTokens->items[curIdx];
         DIRENTRY dirEntry;
         int nextClus;
         int dataSec = getDataSecForClus(cluster);
@@ -507,3 +524,87 @@ void createNewEntry(DIRENTRY *entry, int isDirectory, unsigned int address, char
     entry->FstClusLO = address;
     entry->FileSize = 0;
 }
+
+void rm(char *filename)
+{
+    unsigned int EMPTY_DIRECTORY = 0x00000000;
+
+    //STEP 1 check if file is in directory and erase
+    DIRENTRY dirEntry;
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    bool found = false;
+    int filesize = dirEntry.FileSize;
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        //Move Data to DirEntry
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        {
+            lseek(fatFD, -32, SEEK_CUR);        //Seek 32 bytes back
+            write(fatFD, &EMPTY_DIRECTORY, 32); //Write empty directory
+            found = true;
+            break;
+        }
+    }
+
+
+    if (!found)
+    {
+        printf("File Not found\n");
+        return;
+    }
+
+    if(dirEntry.Attr == 16){
+        printf("Cannot rm a directory, we may implement `rm -r <dir>` in the future\n");
+        return;
+    }
+
+    //STEP 2 Clean out fat
+    unsigned int fat_cluster = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+    unsigned int sector = getDataSecForClus(fat_cluster);
+    unsigned int fat_address = clusterToFatAddress(fat_cluster);
+    unsigned int fatEntry;
+
+    lseek(fatFD, fat_address, SEEK_SET);
+    read(fatFD, &fatEntry, sizeof(fatEntry));
+    int delete_size = filesize / 32;
+    unsigned int EMPTY_BYTE = 0x00;
+    while (filesize > 0)
+    {
+        lseek(fatFD, sector, SEEK_SET);
+
+        if (delete_size > 1)
+        {
+            for (int i = 0; i < filesize; i++)
+            {
+                write(fatFD, &EMPTY_BYTE, 1); //Write empty byte
+                filesize -= 1;
+            }
+        }
+        else
+        {
+            write(fatFD, &EMPTY_DIRECTORY, 32); //Write empty directory
+            filesize -= 32;
+        }
+
+        //write to fat
+        lseek(fatFD, fat_address, SEEK_SET);
+        write(fatFD, 0x00, 4); //Mark fat empty
+
+        if (fatEntry == 0x0FFFFFF8 || fatEntry == 0x0FFFFFFF) //Check if at end of fat
+            break;
+
+        //Move to next cluster
+        sector = getDataSecForClus(fatEntry);
+        fat_address = clusterToFatAddress(fatEntry);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &fatEntry, sizeof(fatEntry));
+    }
+}
+
+unsigned int clusterToFatAddress(unsigned int clusterNum)
+{
+
+    return (((clusterNum * 4) / BootSec.BytesPerSec) + BootSec.RsvdSecCnt) * BootSec.BytesPerSec + ((clusterNum * 4) % BootSec.BytesPerSec);
+}
+
