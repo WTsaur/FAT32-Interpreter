@@ -29,6 +29,10 @@ typedef struct
     unsigned int offset;
 } File_Entry;
 
+#define READ 0
+#define WRITE 1
+#define READ_WRITE 2
+
 File_Entry openFilelist[1028]; //We can make this a linked list if we want it dynamic
 int fileListSize = 0;
 
@@ -39,6 +43,7 @@ void rm(char *filename);
 void open(tokenlist *tokens);
 void close(tokenlist *tokens);
 void lseek(tokenlist *tokens);
+void read(tokenlist *tokens); //WIP
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
@@ -174,7 +179,14 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "read") == 0)
         {
-            //read();
+            if (tokens->size != 3)
+            {
+                printf("error: usage: read <FILE NAME> <SIZE>\n");
+            }
+            else
+            {
+                read(tokens);
+            }
         }
         else if (strcmp(command, "write") == 0)
         {
@@ -649,15 +661,15 @@ void open(tokenlist *tokens)
     int mode_val = -1;
     if (strcmp(mode, "r") == 0)
     {
-        mode_val = 0;
+        mode_val = READ;
     }
     else if (strcmp(mode, "w") == 0)
     {
-        mode_val = 1;
+        mode_val = WRITE;
     }
     else if (strcmp(mode, "rw") == 0)
     {
-        mode_val = 2;
+        mode_val = READ_WRITE;
     }
     else
     {
@@ -756,16 +768,15 @@ void lseek(tokenlist *tokens)
             unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
             for (int j = 0; j < fileListSize; j++)
             {
-                if (openFilelist->first_cluster == cluster_num)
+                if (openFilelist[j].first_cluster == cluster_num)
                 {
 
-                    //Again this will not work will files opening and closing out of order, we need a link list, Check note in file open
                     if (offset > dirEntry.FileSize)
                     {
                         printf("Offset larger then file size\n");
                         return;
                     }
-                    openFilelist[fileListSize].offset = offset;
+                    openFilelist[j].offset = offset;
                     return;
                 }
             }
@@ -774,3 +785,61 @@ void lseek(tokenlist *tokens)
     printf("File Not Open\n");
 }
 
+void read(tokenlist *tokens)
+{
+    DIRENTRY dirEntry;
+    char *filename = tokens->items[1];
+    int offset = atoi(tokens->items[2]);
+    int dataSec = getDataSecForClus(CurClus);
+    File_Entry file;
+    int found = 0;
+    lseek(fatFD, dataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        {
+            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+
+            if (dirEntry.Attr = 16)
+            {
+                printf("Cannot Read Directory\n");
+                return;
+            }
+
+            for (int j = 0; j < fileListSize; j++)
+            {
+                if (openFilelist[j].first_cluster == cluster_num)
+                {
+                    if (openFilelist[j].mode == WRITE)
+                    {
+                        printf("File not in read mode\n");
+                        return;
+                    }
+
+                    if(openFilelist[j].offset + offset > dirEntry.FileSize){
+                        printf("Offset larger then file size\n");
+                        return;
+                    }
+                    file = openFilelist[j];
+                    found = 1;
+                    break;
+                }
+            }
+        }
+        if (found == 1)
+            break;
+    }
+    if (found != 1)
+    {
+        printf("File Not Open\n");
+        return;
+    }
+
+    unsigned int bytes_remain = offset;
+    unsigned int working_cluster = file.first_cluster;
+    //TODO: set pointer offset
+    //READ to offset + size
+
+
+}
