@@ -44,13 +44,13 @@ void file_open(tokenlist *tokens);
 void file_close(tokenlist *tokens);
 void file_seek(tokenlist *tokens);
 void file_read(tokenlist *tokens); //WIP
+int file_create(char *filename, int isDirectory);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
 int searchForDirClusNum(char *dirname);                                   /* searches cwd for dir and returns the cluster num for that dir */
 int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
 unsigned int clusterToFatAddress(unsigned int clusterNum);                /*  Takes cluster number and returns fat address*/
-int create(char *filename, int isDirectory);
 void createNewEntry(DIRENTRY *entry, int isDirectory, unsigned int address, char *name); /*Creates empty DIRENTRY object of type file or directory*/
 
 tokenlist *new_tokenlist(void);
@@ -131,14 +131,14 @@ int main(int argc, char *argv[])
             if (tokens->size < 2)
                 printf("error: usage: creat <FILE NAME>\n");
             else
-                create(tokens->items[1], 0);
+                file_create(tokens->items[1], 0);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
             if (tokens->size < 2)
                 printf("error: usage: mkdir <DIR NAME>\n");
             else
-                create(tokens->items[1], 1);
+                file_create(tokens->items[1], 1);
         }
         else if (strcmp(command, "mv") == 0)
         {
@@ -234,7 +234,7 @@ void printInfo()
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
 
-int create(char *filename, int isDirectory)
+int file_create(char *filename, int isDirectory)
 {
     if (strlen(filename) > 8)
     {
