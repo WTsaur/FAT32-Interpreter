@@ -96,31 +96,31 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "ls") == 0)
         {
-            if (tokens->size < 3)
+            if (tokens->size == 2)
                 ls(tokens);
             else
                 printf("error: usage: ls <DIR NAME>\n");
         }
         else if (strcmp(command, "cd") == 0)
         {
-            if (tokens->size < 3)
+            if (tokens->size == 2)
                 cd(tokens);
             else
                 printf("error: usage: cd <DIR NAME>\n");
         }
         else if (strcmp(command, "creat") == 0)
         {
-            if (tokens->size < 2)
-                printf("error: usage: creat <FILE NAME>\n");
-            else
+            if (tokens->size == 2)
                 create(tokens->items[1], 0);
+            else
+                printf("error: usage: creat <FILE NAME>\n");
         }
         else if (strcmp(command, "mkdir") == 0)
         {
-            if (tokens->size < 2)
-                printf("error: usage: mkdir <DIR NAME>\n");
-            else
+            if (tokens->size == 2)
                 create(tokens->items[1], 1);
+            else
+                printf("error: usage: mkdir <DIR NAME>\n");
         }
         else if (strcmp(command, "mv") == 0)
         {
@@ -148,10 +148,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "rm") == 0)
         {
-            if (tokens->size < 2)
-                printf("error: usage: mkdir <DIR NAME>\n");
-            else
+            if (tokens->size != 2)
                 rm(tokens->items[1]);
+            else
+                printf("error: usage: rm <FILE NAME>\n");
         }
         else if (strcmp(command, "cp") == 0)
         {
@@ -532,7 +532,7 @@ void rm(char *filename)
     //STEP 1 check if file is in directory and erase
     DIRENTRY dirEntry;
     lseek(fatFD, CurDataSec, SEEK_SET);
-    bool found = false;
+    int found = 0;
     int filesize = dirEntry.FileSize;
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
     {
@@ -542,7 +542,7 @@ void rm(char *filename)
         {
             lseek(fatFD, -32, SEEK_CUR);        //Seek 32 bytes back
             write(fatFD, &EMPTY_DIRECTORY, 32); //Write empty directory
-            found = true;
+            found = 1;
             break;
         }
     }

@@ -10,6 +10,9 @@
 * implemented 'cd'
 * implemented 'creat'
 * implemented 'mkdir'
+* implemented 'rm'
+* implemented 'open'
+* implemented 'close'
 
 ## William Tsaur
 * README.md
