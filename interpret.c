@@ -861,26 +861,43 @@ void read(tokenlist *tokens)
     while (bytes_remain > 0)
     {
 
+        if (byte_offset == cluster_size)
+        {
+            unsigned int fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
+            byte_offset = 0;
+            if (working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF)
+            {
+                //printf("Working Cluster %x\n", working_cluster);
+                break;
+            }
+        }
+
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
 
         if (cluster_size - byte_offset >= bytes_remain)
         {
-            //printf("1\n");
-            char *string[offset];
+            //printf("Bytes Remain %i\n", bytes_remain);
+
+            char *string[bytes_remain + 2];
+            string[bytes_remain] = '\0';
             read(fatFD, &string, bytes_remain);
+
             bytes_remain -= bytes_remain;
-            printf("%s", string);
+            printf("%s\n", string);
         }
         else
         {
-            // printf("1\n");
-            char *string[offset];
+            //printf("Bytes Remain %i\n", cluster_size - byte_offset);
+            char *string[cluster_size - byte_offset + 2];
             read(fatFD, &string, cluster_size - byte_offset);
+            string[cluster_size - byte_offset] = '\0';
             bytes_remain -= cluster_size - byte_offset;
-            printf("%s", string);
+            printf("%s\n", string);
         }
-            //printf("Bytes Remain %i\n", bytes_remain);
-            //printf("Bytes Offset %i\n", byte_offset);
+        //printf("Bytes Remain %i\n", bytes_remain);
+        //printf("Bytes Offset %i\n", byte_offset);
 
         byte_offset = 0;
         unsigned int fat_address = clusterToFatAddress(working_cluster);
