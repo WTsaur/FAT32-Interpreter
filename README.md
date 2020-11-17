@@ -13,6 +13,7 @@
 * implemented 'rm'
 * implemented 'open'
 * implemented 'close'
+* implemented 'read'
 
 ## William Tsaur
 * README.md
@@ -22,6 +23,7 @@
 * implemented 'info'
 * implemented 'ls'
 * implemented 'cd'
+* implemented 'size'
 
 ## Michael Styron
 * 
