@@ -45,6 +45,7 @@ void file_close(tokenlist *tokens);
 void file_seek(tokenlist *tokens);
 void file_read(tokenlist *tokens); //WIP
 int file_create(char *filename, int isDirectory);
+void size(char* filename);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
@@ -110,32 +111,35 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "size") == 0)
         {
-            //size();
+            if (tokens->size == 2)
+                size(tokens->items[1]);
+            else
+                printf("error: usage: size <FILE NAME>\n");
         }
         else if (strcmp(command, "ls") == 0)
         {
-            if (tokens->size < 3)
+            if (tokens->size <= 2)
                 ls(tokens);
             else
                 printf("error: usage: ls <DIR NAME>\n");
         }
         else if (strcmp(command, "cd") == 0)
         {
-            if (tokens->size < 3)
+            if (tokens->size <= 2)
                 cd(tokens);
             else
                 printf("error: usage: cd <DIR NAME>\n");
         }
         else if (strcmp(command, "creat") == 0)
         {
-            if (tokens->size < 2)
+            if (tokens->size == 2)
                 printf("error: usage: creat <FILE NAME>\n");
             else
                 file_create(tokens->items[1], 0);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
-            if (tokens->size < 2)
+            if (tokens->size == 2)
                 printf("error: usage: mkdir <DIR NAME>\n");
             else
                 file_create(tokens->items[1], 1);
@@ -888,4 +892,30 @@ void file_read(tokenlist *tokens)
         read(fatFD, &working_cluster, sizeof(dirEntry));
     }
     printf("\n");
+}
+
+void size(char* filename) {
+    DIRENTRY dirEntry;
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++) {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        //32 are files, 16 are folders
+        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
+        {
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+            {
+                if (dirEntry.Attr == 32)
+                {
+                    printf("%i bytes\n", dirEntry.FileSize);
+                    return;
+                }
+                else
+                {
+                    printf("error: %s is not a file\n", filename);
+                    return;
+                }
+            }
+        }
+    }
+    printf("error: %s does not exist\n", filename);
 }
