@@ -38,6 +38,7 @@ int fileListSize = 0;
 
 void printInfo();
 void ls(tokenlist *tokens);
+void size(tokenlist *tokens);
 void cd(tokenlist *tokens);
 void rm(char *filename);
 void open(tokenlist *tokens);
@@ -50,7 +51,8 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* con
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
 int searchForDirClusNum(char *dirname, unsigned int cluster);             /* searches cwd for dir and returns the cluster num for that dir */
 int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
-unsigned int clusterToFatAddress(unsigned int clusterNum);                /*  Takes cluster number and returns fat address*/
+
+unsigned int clusterToFatAddress(unsigned int clusterNum); /*  Takes cluster number and returns fat address*/
 int create(char *filename, int isDirectory, unsigned int cluster);
 void createNewEntry(DIRENTRY *entry, int isDirectory, unsigned int address, char *name); /*Creates empty DIRENTRY object of type file or directory*/
 
@@ -111,7 +113,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "size") == 0)
         {
-            //size();
+            if (tokens->size < 3)
+                size(tokens);
+            else
+                printf("error: usage: ls <FILE NAME>\n");
         }
         else if (strcmp(command, "ls") == 0)
         {
@@ -371,6 +376,44 @@ int create(char *filename, int isDirectory, unsigned int cluster)
         write(fatFD, &dot2Directory, sizeof(DIRENTRY));
     }
 }
+void size(tokenlist *tokens)
+{
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    char *dirname = tokens->items[1];
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+    {
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+        //lseek sets read pointer
+        lseek(fatFD, dataSec, SEEK_SET);
+
+        DIRENTRY dirEntry;
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+        {
+
+            //Move Data to DirEntry
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+            //32 are files, 16 are folders
+            if (strncmp(dirEntry.Name, dirname, strlen(dirname)) == 0)
+            {
+                if (strlen(dirEntry.Name) > 0 && dirEntry.Attr == 32)
+                {
+                    printf("%s\tsize: %d\n", dirEntry.Name, dirEntry.FileSize);
+                    return;
+                }
+                if(dirEntry.Attr == 16){
+                    printf("Cannot get size of Directory\n");
+                    return;
+                }
+            }
+        }
+
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
+    }
+}
 
 void ls(tokenlist *tokens)
 {
@@ -410,6 +453,7 @@ void ls(tokenlist *tokens)
                 printf("%s\n", dirEntry.Name);
                 // printf("Type: %i\n", dirEntry.Attr);
             }
+
             // printf("Directory Offset %i\n", CurDataSec);
             // printf("Size: %i\n", dirEntry.FileSize);
         }
