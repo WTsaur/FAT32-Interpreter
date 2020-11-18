@@ -51,7 +51,7 @@ int getDataSecForClus(int N);                                             /* cal
 int searchForDirClusNum(char *dirname, unsigned int cluster);             /* searches cwd for dir and returns the cluster num for that dir */
 int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
 unsigned int clusterToFatAddress(unsigned int clusterNum);                /*  Takes cluster number and returns fat address*/
-int create(char *filename, int isDirectory);
+int create(char *filename, int isDirectory, unsigned int cluster);
 void createNewEntry(DIRENTRY *entry, int isDirectory, unsigned int address, char *name); /*Creates empty DIRENTRY object of type file or directory*/
 
 tokenlist *new_tokenlist(void);
@@ -132,14 +132,14 @@ int main(int argc, char *argv[])
             if (tokens->size < 2)
                 printf("error: usage: creat <FILE NAME>\n");
             else
-                create(tokens->items[1], 0);
+                create(tokens->items[1], 0, CurClus);
         }
         else if (strcmp(command, "mkdir") == 0)
         {
             if (tokens->size < 2)
                 printf("error: usage: mkdir <DIR NAME>\n");
             else
-                create(tokens->items[1], 1);
+                create(tokens->items[1], 1, CurClus);
         }
         else if (strcmp(command, "mv") == 0)
         {
@@ -242,7 +242,7 @@ void printInfo()
     printf("Root Cluster: 0x%.2X\n", BootSec.RootClus);
 }
 
-int create(char *filename, int isDirectory)
+int create(char *filename, int isDirectory, unsigned int cluster)
 {
     if (strlen(filename) > 8)
     {
@@ -293,15 +293,18 @@ int create(char *filename, int isDirectory)
         {
 
             //Need to read and check if empty
-            lseek(fatFD, CurDataSec + (j * 32), SEEK_SET);
+            lseek(fatFD, getDataSecForClus(cluster) + (j * 32), SEEK_SET);
             read(fatFD, &testDir, sizeof(DIRENTRY));
             if (testDir.Name[0] == 0x00 || testDir.Name[0] == 0xE5)
             {
-                data_write_location = CurDataSec + (j * 32);
+                data_write_location = getDataSecForClus(cluster) + (j * 32);
                 found = 1;
                 break;
             }
         }
+        unsigned int fat_address = clusterToFatAddress(cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &cluster, sizeof(dirEntry));
     }
     if (found == 1)
     {
@@ -311,8 +314,46 @@ int create(char *filename, int isDirectory)
     }
     else
     {
-        printf("Directory Full\n");
-        return -1;
+        unsigned int fat_address;
+        unsigned int working_cluster = CurClus;
+        printf("Directory Full\n"); //Expand Cluster
+        unsigned int cluster_cpy = working_cluster;
+        //Check if need to go to next cluster
+        while ((working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+        {
+            cluster_cpy = working_cluster;
+            fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
+        }
+        unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec) / BootSec.SecPerClus;
+        unsigned int fat_entry;
+        unsigned int fat_write_address;
+        unsigned int fat_cluster;
+        unsigned int FREE_CLUSTER = 0x00000000;
+        unsigned int FAT_END = 0x0FFFFFF8;
+        int i = 0;
+        while (i < cluster_count)
+        {
+
+            fat_write_address = clusterToFatAddress(i);
+            lseek(fatFD, fat_write_address, SEEK_SET);
+            read(fatFD, &fat_entry, sizeof(fat_entry));
+            if (fat_entry == FREE_CLUSTER)
+            {
+                fat_cluster = i;
+                break;
+            }
+            i++;
+        }
+
+        //Write new fat end
+        lseek(fatFD, fat_write_address, SEEK_SET);
+        write(fatFD, &FAT_END, 4);
+
+        lseek(fatFD, clusterToFatAddress(cluster_cpy), SEEK_SET);
+        write(fatFD, &fat_cluster, 4);
+        create(filename, isDirectory, cluster);
     }
 
     if (isDirectory)
