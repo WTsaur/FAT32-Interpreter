@@ -802,6 +802,8 @@ void read(tokenlist *tokens)
     File_Entry file;
     int found = 0;
     lseek(fatFD, dataSec, SEEK_SET);
+    int offset;
+
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
     {
         read(fatFD, &dirEntry, sizeof(DIRENTRY));
@@ -831,6 +833,8 @@ void read(tokenlist *tokens)
                         return;
                     }
                     file = openFilelist[j];
+                    offset = file.offset;
+                    openFilelist[j].offset = offset + size;
                     found = 1;
                     break;
                 }
@@ -845,13 +849,12 @@ void read(tokenlist *tokens)
         return;
     }
 
-    int offset = file.offset;
     unsigned int bytes_remain = size;
     unsigned int working_cluster = file.first_cluster;
 
     //set pointer offset
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
-    unsigned int byte_offset = offset / BootSec.SecPerClus;
+    unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
 
     while (cluster_offset != 0)
@@ -863,8 +866,6 @@ void read(tokenlist *tokens)
 
         cluster_offset--;
     }
-
-    //printf("working cluster %x\n", working_cluster);
     //Traverse and read, switch cluster when needed
     while (bytes_remain > 0)
     {
@@ -886,23 +887,20 @@ void read(tokenlist *tokens)
 
         if (cluster_size - byte_offset >= bytes_remain)
         {
-            //printf("Bytes Remain %i\n", bytes_remain);
-
-            char *string[bytes_remain];
-            string[bytes_remain] = '\0';
+            char string[bytes_remain];
             read(fatFD, &string, bytes_remain);
+            string[bytes_remain] = '\0';
 
             bytes_remain -= bytes_remain;
-            printf("%s\n", string);
+            printf("%s", string);
         }
         else
         {
-            //printf("Bytes Remain %i\n", cluster_size - byte_offset);
-            char *string[cluster_size - byte_offset + 2];
+            char string[cluster_size - byte_offset];
             read(fatFD, &string, cluster_size - byte_offset);
             string[cluster_size - byte_offset] = '\0';
             bytes_remain -= cluster_size - byte_offset;
-            printf("%s\n", string);
+            printf("%s", string);
         }
         //printf("Bytes Remain %i\n", bytes_remain);
         //printf("Bytes Offset %i\n", byte_offset);
@@ -913,7 +911,6 @@ void read(tokenlist *tokens)
         read(fatFD, &working_cluster, sizeof(dirEntry));
     }
     printf("\n");
-    file.offset = offset + size;
 }
 
 void write(tokenlist *tokens)
@@ -926,6 +923,8 @@ void write(tokenlist *tokens)
     unsigned int fileSize;
     File_Entry file;
     int found = 0;
+    int offset = file.offset;
+
     lseek(fatFD, dataSec, SEEK_SET);
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
     {
@@ -960,6 +959,8 @@ void write(tokenlist *tokens)
                     }
                     fileSize = dirEntry.FileSize;
                     file = openFilelist[j];
+                    offset = file.offset;
+                    openFilelist[j].offset = offset + size;
                     found = 1;
                     break;
                 }
@@ -974,13 +975,12 @@ void write(tokenlist *tokens)
         return;
     }
 
-    int offset = file.offset;
     unsigned int bytes_remain = size;
     unsigned int working_cluster = file.first_cluster;
 
     //set pointer offset
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
-    unsigned int byte_offset = offset / BootSec.SecPerClus;
+    unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
 
     while (cluster_offset != 0)
