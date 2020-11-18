@@ -48,7 +48,7 @@ void write(tokenlist *tokens);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
-int searchForDirClusNum(char *dirname);                                   /* searches cwd for dir and returns the cluster num for that dir */
+int searchForDirClusNum(char *dirname, unsigned int cluster);             /* searches cwd for dir and returns the cluster num for that dir */
 int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
 unsigned int clusterToFatAddress(unsigned int clusterNum);                /*  Takes cluster number and returns fat address*/
 int create(char *filename, int isDirectory);
@@ -333,39 +333,49 @@ int create(char *filename, int isDirectory)
 
 void ls(tokenlist *tokens)
 {
-    unsigned int dataSec = CurDataSec;
-    if (tokens->size > 1)
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
     {
-        //search for directory matching DIRNAME
+        unsigned int dataSec = getDataSecForClus(working_cluster);
         char *dirname = tokens->items[1];
-        if (strcmp(dirname, ".") != 0)
+        if (tokens->size > 1)
         {
-            int clusNum = searchForDirClusNum(dirname);
-            if (clusNum >= 0)
-                dataSec = getDataSecForClus(clusNum);
-            else
-                return;
+            //search for directory matching DIRNAME
+            char *dirname = tokens->items[1];
+            if (strcmp(dirname, ".") != 0)
+            {
+                int clusNum = searchForDirClusNum(dirname, working_cluster);
+                if (clusNum >= 0)
+                    dataSec = getDataSecForClus(clusNum);
+                else
+                    return;
+            }
         }
-    }
 
-    //lseek sets read pointer
-    lseek(fatFD, dataSec, SEEK_SET);
+        //lseek sets read pointer
+        lseek(fatFD, dataSec, SEEK_SET);
 
-    DIRENTRY dirEntry;
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
-    {
-
-        //Move Data to DirEntry
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-
-        //32 are files, 16 are folders
-        if (strlen(dirEntry.Name) > 0 && (dirEntry.Attr == 32 || dirEntry.Attr == 16))
+        DIRENTRY dirEntry;
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            printf("%s\n", dirEntry.Name);
-            // printf("Type: %i\n", dirEntry.Attr);
+
+            //Move Data to DirEntry
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+
+            //32 are files, 16 are folders
+            if (strlen(dirEntry.Name) > 0 && (dirEntry.Attr == 32 || dirEntry.Attr == 16))
+            {
+                printf("%s\n", dirEntry.Name);
+                // printf("Type: %i\n", dirEntry.Attr);
+            }
+            // printf("Directory Offset %i\n", CurDataSec);
+            // printf("Size: %i\n", dirEntry.FileSize);
         }
-        // printf("Directory Offset %i\n", CurDataSec);
-        // printf("Size: %i\n", dirEntry.FileSize);
+
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
     }
 }
 
@@ -381,20 +391,30 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO)
 
 void cd(tokenlist *tokens)
 {
+    DIRENTRY dirEntry;
     if (tokens->size > 1)
     {
-        //search for directory matching DIRNAME
-        char *dirname = tokens->items[1];
-        if (strcmp(dirname, ".") == 0)
+        unsigned int working_cluster = CurClus;
+        unsigned int fat_address;
+        while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
         {
-            return;
-        }
+            //search for directory matching DIRNAME
+            char *dirname = tokens->items[1];
+            if (strcmp(dirname, ".") == 0)
+            {
+                return;
+            }
 
-        int clus = searchForDirClusNum(dirname);
-        if (clus >= 0)
-        {
-            CurClus = searchForDirClusNum(dirname);
-            CurDataSec = getDataSecForClus(CurClus);
+            int clus = searchForDirClusNum(dirname, working_cluster);
+            if (clus >= 0)
+            {
+                CurClus = searchForDirClusNum(dirname, working_cluster);
+                CurDataSec = getDataSecForClus(working_cluster);
+                return;
+            }
+            fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
         }
     }
 }
@@ -512,10 +532,10 @@ int getDataSecForClus(int N)
     return (BootSec.RsvdSecCnt + N - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
 }
 
-int searchForDirClusNum(char *dirname)
+int searchForDirClusNum(char *dirname, unsigned int cluster)
 {
     tokenlist *dirTokens = get_tokens(dirname, "/");
-    return searchForDirClusNum_H(dirTokens, 0, CurClus);
+    return searchForDirClusNum_H(dirTokens, 0, cluster);
 }
 
 int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster)
