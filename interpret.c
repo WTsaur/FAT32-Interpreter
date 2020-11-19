@@ -40,6 +40,8 @@ void printInfo();
 void ls(tokenlist *tokens);
 void cd(tokenlist *tokens);
 void rm(char *filename);
+void cp(char *filename, char *dirname);
+void mv(char *filename, char *dirname);
 void file_open(tokenlist *tokens);
 void file_close(tokenlist *tokens);
 void file_seek(tokenlist *tokens);
@@ -146,7 +148,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "mv") == 0)
         {
-            //mv();
+          if (tokens->size != 3)
+                printf("error: usage: mv <DIR NAME/FILE NAME> <DIR NAME/FILE NAME>\n");
+          else
+                mv(tokens->items[1], tokens->items[2]);
         }
         else if (strcmp(command, "open") == 0)
         {
@@ -205,7 +210,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "cp") == 0)
         {
-            //cp();
+            if (tokens->size != 3)
+                printf("error: usage: cp <FILENAME> <DIRNAME>\n");
+            else
+                cp(tokens->items[1], tokens->items[2]);
         }
         else if (strcmp(command, "rmdir") == 0)
         {
@@ -918,4 +926,87 @@ void size(char* filename) {
         }
     }
     printf("error: %s does not exist\n", filename);
+}
+
+void cp(char *filename, char* dirname)
+{
+    DIRENTRY dirEntry;
+    int found = 0;
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    for(int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
+        {
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+            {
+                if (dirEntry.Attr == 16)
+                {
+                    printf("error: %s is not a file\n", filename);
+                    return;
+                }
+                else if(dirEntry.Attr == 32)
+                    found = 1;
+            }
+        }
+        if (found == 1)
+          break;
+    }
+    //if (found == 1)
+        //file_create(filename, 0);
+    //else
+        //printf("error: file not found\n");
+    unsigned int fSize = dirEntry.FileSize;
+    char * buffer = malloc(fSize);
+
+    unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+    lseek(fatFD, cluster_num, SEEK_SET);
+    read(fatFD, &buffer, fSize);
+    printf("%s\n", buffer);
+}
+
+void mv(char* filename1, char* filename2)
+{
+    int isDir1;
+    int isDir2;
+    int dirExists1 = 0;
+    int dirExists2 = 0;
+    DIRENTRY dirEntry;
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        //32 are files, 16 are folders
+        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 16 || dirEntry.Attr == 32))
+        {
+            if (strncmp(dirEntry.Name, filename2, strlen(filename2)) == 0)
+            {
+                if (dirEntry.Attr == 32)
+                    isDir2 = 0;
+                else
+                    isDir2 = 1;
+                dirExists2 = 1;
+            }
+            break;
+        }
+    }
+
+    lseek(fatFD, CurDataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if ((strlen(dirEntry.Name) > 0) && (dirEntry.Attr == 0 || dirEntry.Attr == 32))
+        {
+            if (strncmp(dirEntry.Name, filename1, strlen(filename1)) == 0)
+            {
+                if (dirEntry.Attr == 32)
+                {
+                    if (dirExists2 == 0)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }
