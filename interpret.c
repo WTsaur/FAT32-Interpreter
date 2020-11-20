@@ -1266,10 +1266,11 @@ void cp(tokenlist *tokens)
                 found = 1;
         }
     }
-    if(found == 1)
-        cd(dirName, 2);
+
     char *buffer = malloc(fileSize);
     buffer = read(filename, fileSize, 1);
+    if(found == 1)
+        cd(dirName, 2);
     if(found != 1)
         filename = dirName;
     create(filename, 0, CurClus);
