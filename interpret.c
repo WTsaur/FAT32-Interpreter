@@ -39,13 +39,15 @@ int fileListSize = 0;
 void printInfo();
 void ls(tokenlist *tokens);
 void size(tokenlist *tokens);
-void cd(tokenlist *tokens);
+void cd(char *dirname, int size);
 void rm(char *filename);
 void open(tokenlist *tokens);
 void close(tokenlist *tokens);
 void lseek(tokenlist *tokens);
-void read(tokenlist *tokens);
-void write(tokenlist *tokens);
+char *read(char *filename, int size, int flag);
+void write(char *filename, int size, char *buffer, int flag);
+void cp(tokenlist *tokens);
+void mv(tokenlist *tokens);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
 int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
@@ -127,8 +129,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "cd") == 0)
         {
-            if (tokens->size < 3)
-                cd(tokens);
+            if (tokens->size == 2)
+                cd(tokens->items[1], 2);
+            else if(tokens->size == 1)
+                cd(tokens->items[1], 1);
             else
                 printf("error: usage: cd <DIR NAME>\n");
         }
@@ -191,7 +195,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                read(tokens);
+                read(tokens->items[1], atoi(tokens->items[2]), 0);
             }
         }
         else if (strcmp(command, "write") == 0)
@@ -202,7 +206,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                write(tokens);
+                write(tokens->items[1], atoi(tokens->items[2]), tokens->items[3], 0);
             }
         }
         else if (strcmp(command, "rm") == 0)
@@ -214,7 +218,10 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "cp") == 0)
         {
-            //cp();
+            if (tokens->size != 3)
+                printf("error: usage: cp <FILENAME> <DIRNAME>\n");
+            else
+                cp(tokens);
         }
         else if (strcmp(command, "rmdir") == 0)
         {
@@ -474,17 +481,16 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO)
     return res;
 }
 
-void cd(tokenlist *tokens)
+void cd(char *dirname, int size)
 {
     DIRENTRY dirEntry;
-    if (tokens->size > 1)
+    if (size > 1)
     {
         unsigned int working_cluster = CurClus;
         unsigned int fat_address;
         while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
         {
             //search for directory matching DIRNAME
-            char *dirname = tokens->items[1];
             if (strcmp(dirname, ".") == 0)
             {
                 return;
@@ -898,51 +904,57 @@ void lseek(tokenlist *tokens)
     printf("File Not Open\n");
 }
 
-void read(tokenlist *tokens)
+char *read(char *filename, int size, int flag)
 {
     DIRENTRY dirEntry;
-    char *filename = tokens->items[1];
-    int size = atoi(tokens->items[2]);
     int dataSec = getDataSecForClus(CurClus);
     File_Entry file;
     int found = 0;
     lseek(fatFD, dataSec, SEEK_SET);
-    int offset;
+    int offset = 0;
+    unsigned int cluster_num;
+    char *buffer = malloc(size);
 
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
     {
         read(fatFD, &dirEntry, sizeof(DIRENTRY));
         if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
         {
-            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+            cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
 
             if (dirEntry.Attr == 16)
             {
                 printf("Cannot Read Directory\n");
                 return;
             }
-
-            for (int j = 0; j < fileListSize; j++)
+            if (flag == 0)
             {
-                if (openFilelist[j].first_cluster == cluster_num)
+                for (int j = 0; j < fileListSize; j++)
                 {
-                    if (openFilelist[j].mode == WRITE)
+                    if (openFilelist[j].first_cluster == cluster_num)
                     {
-                        printf("File not in read mode\n");
-                        return;
-                    }
+                        if (openFilelist[j].mode == WRITE)
+                        {
+                            printf("File not in read mode\n");
+                            return;
+                        }
 
-                    if (openFilelist[j].offset + size > dirEntry.FileSize)
-                    {
-                        printf("Offset larger then file size\n");
-                        return;
+                        if (openFilelist[j].offset + size > dirEntry.FileSize)
+                        {
+                            printf("Offset larger then file size\n");
+                            return;
+                        }
+                        file = openFilelist[j];
+                        offset = file.offset;
+                        openFilelist[j].offset = offset + size;
+                        found = 1;
+                        break;
                     }
-                    file = openFilelist[j];
-                    offset = file.offset;
-                    openFilelist[j].offset = offset + size;
-                    found = 1;
-                    break;
                 }
+            }
+            else
+            {
+                found = 1;
             }
         }
         if (found == 1)
@@ -955,7 +967,11 @@ void read(tokenlist *tokens)
     }
 
     unsigned int bytes_remain = size;
-    unsigned int working_cluster = file.first_cluster;
+    unsigned int working_cluster;
+    if (flag == 0)
+        working_cluster = file.first_cluster;
+    else
+        working_cluster = cluster_num;
 
     //set pointer offset
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
@@ -997,7 +1013,10 @@ void read(tokenlist *tokens)
             string[bytes_remain] = '\0';
 
             bytes_remain -= bytes_remain;
-            printf("%s", string);
+            if (flag == 0)
+                printf("%s", string);
+            else
+                strcat(buffer, string);
         }
         else
         {
@@ -1005,7 +1024,10 @@ void read(tokenlist *tokens)
             read(fatFD, &string, cluster_size - byte_offset);
             string[cluster_size - byte_offset] = '\0';
             bytes_remain -= cluster_size - byte_offset;
-            printf("%s", string);
+            if (flag == 0)
+                printf("%s", string);
+            else
+                strcat(buffer, string);
         }
         //printf("Bytes Remain %i\n", bytes_remain);
         //printf("Bytes Offset %i\n", byte_offset);
@@ -1016,19 +1038,19 @@ void read(tokenlist *tokens)
         read(fatFD, &working_cluster, sizeof(dirEntry));
     }
     printf("\n");
+    if (flag != 0)
+        return buffer;
 }
 
-void write(tokenlist *tokens)
+void write(char *filename, int size, char *buffer, int flag)
 {
     DIRENTRY dirEntry;
-    char *filename = tokens->items[1];
-    int size = atoi(tokens->items[2]);
     int dataSec = getDataSecForClus(CurClus);
-    char *buffer = tokens->items[3];
     unsigned int fileSize;
     File_Entry file;
     int found = 0;
     int offset = file.offset;
+    unsigned int cluster_num;
 
     lseek(fatFD, dataSec, SEEK_SET);
     for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
@@ -1036,39 +1058,49 @@ void write(tokenlist *tokens)
         read(fatFD, &dirEntry, sizeof(DIRENTRY));
         if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
         {
-            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+            cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
 
             if (dirEntry.Attr == 16)
             {
                 printf("Cannot Read Directory\n");
                 return;
             }
-
-            for (int j = 0; j < fileListSize; j++)
+            if (flag == 0)
             {
-                if (openFilelist[j].first_cluster == cluster_num)
+                for (int j = 0; j < fileListSize; j++)
                 {
-                    if (openFilelist[j].mode == READ)
+                    if (openFilelist[j].first_cluster == cluster_num)
                     {
-                        printf("File not in write mode\n");
-                        return;
-                    }
+                        if (openFilelist[j].mode == READ)
+                        {
+                            printf("File not in write mode\n");
+                            return;
+                        }
 
-                    if (openFilelist[j].offset + size > dirEntry.FileSize)
-                    {
-                        //Expand Size
-                        unsigned int newSize = file.offset + size;
+                        if (openFilelist[j].offset + size > dirEntry.FileSize)
+                        {
+                            //Expand Size
+                            unsigned int newSize = file.offset + size;
 
-                        lseek(fatFD, -4, SEEK_CUR);
-                        write(fatFD, &newSize, 4);
+                            lseek(fatFD, -4, SEEK_CUR);
+                            write(fatFD, &newSize, 4);
+                        }
+                        fileSize = dirEntry.FileSize;
+                        file = openFilelist[j];
+                        offset = file.offset;
+                        openFilelist[j].offset = offset + size;
+                        found = 1;
+                        break;
                     }
-                    fileSize = dirEntry.FileSize;
-                    file = openFilelist[j];
-                    offset = file.offset;
-                    openFilelist[j].offset = offset + size;
-                    found = 1;
-                    break;
                 }
+            }
+            else
+            {
+                unsigned int newSize = size;
+
+                lseek(fatFD, -4, SEEK_CUR);
+                write(fatFD, &newSize, 4);
+                found = 1;
             }
         }
         if (found == 1)
@@ -1081,7 +1113,11 @@ void write(tokenlist *tokens)
     }
 
     unsigned int bytes_remain = size;
-    unsigned int working_cluster = file.first_cluster;
+    unsigned int working_cluster;
+    if (flag == 0)
+        working_cluster = file.first_cluster;
+    else
+        working_cluster = cluster_num;
 
     //set pointer offset
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
@@ -1188,3 +1224,56 @@ void write(tokenlist *tokens)
     }
 }
 
+void cp(tokenlist *tokens)
+{
+    char *filename = tokens->items[1];
+    char *dirName = tokens->items[2];
+    DIRENTRY dirEntry;
+    int dataSec = getDataSecForClus(CurClus);
+    int found = 0;
+    lseek(fatFD, dataSec, SEEK_SET);
+    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        {
+            if (dirEntry.Attr == 16)
+            {
+                printf("error: cannot copy a directory currently\n");
+                return;
+            }
+            else
+                found = 1;
+
+        }
+        if (found == 1)
+            break;
+    }
+    found = 0;
+    unsigned int fileSize = dirEntry.FileSize;
+    lseek(fatFD, dataSec, SEEK_SET);
+    for(int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if(strncmp(dirEntry.Name, dirName, strlen(dirName)) == 0)
+        {
+            if(dirEntry.Attr == 32)
+            {
+                printf("error: cannot copy to a file\n");
+                return;
+            }
+            else
+                found = 1;
+        }
+    }
+    if(found == 1)
+        cd(dirName, 2);
+    char *buffer = malloc(fileSize);
+    buffer = read(filename, fileSize, 1);
+    if(found != 1)
+        filename = dirName;
+    create(filename, 0, CurClus);
+    write(filename, fileSize, buffer, 1);
+    if(found == 1)
+        cd("..", 2);
+}
