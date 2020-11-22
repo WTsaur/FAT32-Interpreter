@@ -14,6 +14,7 @@
 * implemented 'open'
 * implemented 'close'
 * implemented 'read'
+* implemented 'lseek'
 
 ## William Tsaur
 * README.md
@@ -21,6 +22,7 @@
 * BPB.h
 * makefile
 * implemented 'info'
+* implemented 'exit'
 * implemented 'ls'
 * implemented 'cd'
 * implemented 'size'
