@@ -41,11 +41,11 @@ void ls(tokenlist *tokens);
 void size(tokenlist *tokens);
 void cd(tokenlist *tokens);
 void rm(char *filename);
-void open(tokenlist *tokens);
-void close(tokenlist *tokens);
-void lseek(tokenlist *tokens);
-char *read(tokenlist *tokens, char *filename, int flag);
-void write(tokenlist *tokens, char *filename, char *newText, int flag);
+void openFile(tokenlist *tokens);
+void closeFile(tokenlist *tokens);
+void lseekFAT(tokenlist *tokens);
+char *readFile(tokenlist *tokens, char *filename, int flag);
+void writeFAT(tokenlist *tokens, char *filename, char *newText, int flag);
 int cp(tokenlist *tokens);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                open(tokens);
+                openFile(tokens);
             }
         }
         else if (strcmp(command, "close") == 0)
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                lseek(tokens);
+                lseekFAT(tokens);
             }
         }
         else if (strcmp(command, "read") == 0)
@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                read(tokens, "", 0);
+                readFile(tokens, "", 0);
             }
         }
         else if (strcmp(command, "write") == 0)
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                write(tokens, "", "", 0);
+                writeFAT(tokens, "", "", 0);
             }
         }
         else if (strcmp(command, "rm") == 0)
@@ -780,7 +780,7 @@ unsigned int clusterToFatAddress(unsigned int clusterNum)
 
     return (((clusterNum * 4) / BootSec.BytesPerSec) + BootSec.RsvdSecCnt) * BootSec.BytesPerSec + ((clusterNum * 4) % BootSec.BytesPerSec);
 }
-void open(tokenlist *tokens)
+void openFile(tokenlist *tokens)
 {
     DIRENTRY dirEntry;
     char *filename = tokens->items[1];
@@ -848,7 +848,7 @@ void open(tokenlist *tokens)
     printf("File not found\n");
 }
 
-void close(tokenlist *tokens)
+void closeFile(tokenlist *tokens)
 {
     DIRENTRY dirEntry;
     char *filename = tokens->items[1];
@@ -880,7 +880,7 @@ void close(tokenlist *tokens)
     printf("File Not Open\n");
 }
 
-void lseek(tokenlist *tokens)
+void lseekFAT(tokenlist *tokens)
 {
     DIRENTRY dirEntry;
     char *filename = tokens->items[1];
@@ -912,7 +912,7 @@ void lseek(tokenlist *tokens)
     printf("File Not Open\n");
 }
 
-char *read(tokenlist *tokens, char *filen, int flag)
+char *readFile(tokenlist *tokens, char *filen, int flag)
 {
 
     DIRENTRY dirEntry;
@@ -1072,7 +1072,7 @@ char *read(tokenlist *tokens, char *filen, int flag)
     return bufferText;
 }
 
-void write(tokenlist *tokens, char *filen, char *newText, int flag)
+void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
 {
     DIRENTRY dirEntry;
 
@@ -1293,8 +1293,8 @@ int cp(tokenlist *tokens)
 {
     char *filename = tokens->items[1];
     char *desination = tokens->items[2];
-    char *bufferText = read(tokens, filename, 1);
+    char *bufferText = readFile(tokens, filename, 1);
     create(desination, 0, CurClus);
-    write(tokens, desination, bufferText, 1);
+    writeFAT(tokens, desination, bufferText, 1);
 }
 
