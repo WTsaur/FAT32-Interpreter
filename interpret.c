@@ -1292,9 +1292,56 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
 int cp(tokenlist *tokens)
 {
     char *filename = tokens->items[1];
-    char *desination = tokens->items[2];
-    char *bufferText = readFile(tokens, filename, 1);
-    create(desination, 0, CurClus);
-    writeFAT(tokens, desination, bufferText, 1);
+    char *destination = tokens->items[2];
+    DIRENTRY dirEntry;
+    int dataSec = getDataSecForClus(CurClus);
+    int found = 0;
+    lseek(fatFD, dataSec, SEEK_SET);
+    for(int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if(strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        {
+            if(dirEntry.Attr == 16)
+            {
+                printf("error: usage: cp <FILENAME> <DIRNAME/NEW FILE NAME>");
+                return;
+            }
+            else
+                found = 1;
+        }
+    }
+    found = 0;
+    unsigned int fileSize = dirEntry.FileSize;
+    lseek(fatFD, dataSec, SEEK_SET);
+    for(int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    {
+        read(fatFD, &dirEntry, sizeof(DIRENTRY));
+        if(strncmp(dirEntry.Name, destination, strlen(destination)) == 0)
+        {
+            if(dirEntry.Attr == 32)
+            {
+                printf("error: cannot copy to a file\n");
+                return;
+            }
+            else
+                found = 1;
+        }
+    }
+    tokenlist *tokens2 = new_tokenlist();
+    add_token(tokens2, "cd");
+    add_token(tokens2, destination);
+    char *bufferText = malloc(fileSize + 1);
+    bufferText = readFile(tokens, filename, 1);
+    if(found == 1)
+        cd(tokens);
+    else
+        filename = destination;
+    create(filename, 0, CurClus);
+    writeFAT(tokens, filename, bufferText, 1);
+    tokenlist *tokens3 = new_tokenlist();
+    add_token(tokens3, "cd");
+    add_token(tokens3, "..");
+    if(found == 1)
+        cd(tokens3);
 }
-
