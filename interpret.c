@@ -37,21 +37,21 @@ File_Entry openFilelist[1028]; //We can make this a linked list if we want it dy
 int fileListSize = 0;
 
 void printInfo();
-void ls(tokenlist *tokens);
+void ls(tokenlist *token, int flag = 0);
 void size(tokenlist *tokens);
-void cd(tokenlist *tokens);
+void cd(char *path, int flag);
 void rm(char *filename);
 void openFile(tokenlist *tokens);
 void closeFile(tokenlist *tokens);
 void lseekFAT(tokenlist *tokens);
-char *readFile(tokenlist *tokens, char *filename, int flag);
-void writeFAT(tokenlist *tokens, char *filename, char *newText, int flag);
-int cp(tokenlist *tokens);
+char *readFAT(tokenlist *tokens, char *filename, int flag);
+void writeFAT(tokenlist *tokens, char *filename, char *newText, unsigned int cluster, int flag);
+int cp(tokenlist *tokens, int isRemove);
 void trimStringRight(char *str);
-int HiLoClusConvert(unsigned short HI, unsigned short LO);                /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
-int getDataSecForClus(int N);                                             /* calculates the data sector for a given cluster, N */
-int searchForDirClusNum(char *dirname, unsigned int cluster);             /* searches cwd for dir and returns the cluster num for that dir */
-int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster); /* helper func for searchForDirClusNum */
+int HiLoClusConvert(unsigned short HI, unsigned short LO);                          /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
+int getDataSecForClus(int N);                                                       /* calculates the data sector for a given cluster, N */
+int searchForDirClusNum(char *dirname, unsigned int cluster, int flag);             /* searches cwd for dir and returns the cluster num for that dir */
+int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster, int flag); /* helper func for searchForDirClusNum */
 
 unsigned int clusterToFatAddress(unsigned int clusterNum); /*  Takes cluster number and returns fat address*/
 int create(char *filename, int isDirectory, unsigned int cluster);
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "size") == 0)
         {
-            if (tokens->size < 3)
+            if (tokens->size == 2)
                 size(tokens);
             else
                 printf("error: usage: ls <FILE NAME>\n");
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
         else if (strcmp(command, "cd") == 0)
         {
             if (tokens->size < 3)
-                cd(tokens);
+                cd(tokens->items[1], 0);
             else
                 printf("error: usage: cd <DIR NAME>\n");
         }
@@ -149,7 +149,14 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "mv") == 0)
         {
-            //mv();
+            if (tokens->size != 3)
+            {
+                printf("error: usage cp <FILE NAME> <Desination>");
+            }
+            else
+            {
+                cp(tokens, 1);
+            }
         }
         else if (strcmp(command, "open") == 0)
         {
@@ -170,7 +177,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                close(tokens);
+                closeFile(tokens);
             }
         }
         else if (strcmp(command, "lseek") == 0)
@@ -192,7 +199,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                readFile(tokens, "", 0);
+                readFAT(tokens, "", 0);
             }
         }
         else if (strcmp(command, "write") == 0)
@@ -203,7 +210,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                writeFAT(tokens, "", "", 0);
+                writeFAT(tokens, "", "", CurClus, 0);
             }
         }
         else if (strcmp(command, "rm") == 0)
@@ -215,7 +222,14 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(command, "cp") == 0)
         {
-            cp(tokens);
+            if (tokens->size != 3)
+            {
+                printf("error: usage cp <FILE NAME> <Desination>");
+            }
+            else
+            {
+                cp(tokens, 0);
+            }
         }
         else if (strcmp(command, "rmdir") == 0)
         {
@@ -226,6 +240,7 @@ int main(int argc, char *argv[])
             //exit
             free(buf);
             free_tokens(tokens);
+            close(fatFD);
             break;
         }
         else
@@ -350,7 +365,6 @@ int create(char *filename, int isDirectory, unsigned int cluster)
         unsigned int FREE_CLUSTER = 0x00000000;
         unsigned int FAT_END = 0x0FFFFFF8;
         int i = 0;
-
         while (i < cluster_count)
         {
 
@@ -429,7 +443,7 @@ void size(tokenlist *tokens)
     }
 }
 
-void ls(tokenlist *tokens)
+void ls(tokenlist *tokens, int flag = 0)
 {
     unsigned int working_cluster = CurClus;
     unsigned int fat_address;
@@ -443,7 +457,7 @@ void ls(tokenlist *tokens)
             char *dirname = tokens->items[1];
             if (strcmp(dirname, ".") != 0)
             {
-                int clusNum = searchForDirClusNum(dirname, working_cluster);
+                int clusNum = searchForDirClusNum(dirname, working_cluster, flag);
                 if (clusNum >= 0)
                     dataSec = getDataSecForClus(clusNum);
                 else
@@ -488,33 +502,36 @@ int HiLoClusConvert(unsigned short HI, unsigned short LO)
     return res;
 }
 
-void cd(tokenlist *tokens)
+void cd(char *path, int flag)
 {
     DIRENTRY dirEntry;
-    if (tokens->size > 1)
-    {
-        unsigned int working_cluster = CurClus;
-        unsigned int fat_address;
-        while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
-        {
-            //search for directory matching DIRNAME
-            char *dirname = tokens->items[1];
-            if (strcmp(dirname, ".") == 0)
-            {
-                return;
-            }
 
-            int clus = searchForDirClusNum(dirname, working_cluster);
-            if (clus >= 0)
-            {
-                CurClus = searchForDirClusNum(dirname, working_cluster);
-                CurDataSec = getDataSecForClus(working_cluster);
-                return;
-            }
-            fat_address = clusterToFatAddress(working_cluster);
-            lseek(fatFD, fat_address, SEEK_SET);
-            read(fatFD, &working_cluster, sizeof(dirEntry));
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    int clus;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+    {
+        //search for directory matching DIRNAME
+        char *dirname = path;
+        if (strcmp(dirname, ".") == 0)
+        {
+            return;
         }
+
+        clus = searchForDirClusNum(dirname, working_cluster, flag);
+        if (clus >= 0)
+        {
+            CurClus = searchForDirClusNum(dirname, working_cluster, flag);
+            CurDataSec = getDataSecForClus(working_cluster);
+            return;
+        }
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
+    }
+    if (clus < 0 && flag == 0)
+    {
+        printf("error: %s does not exist\n", path);
     }
 }
 
@@ -631,13 +648,13 @@ int getDataSecForClus(int N)
     return (BootSec.RsvdSecCnt + N - BootSec.RootClus + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec;
 }
 
-int searchForDirClusNum(char *dirname, unsigned int cluster)
+int searchForDirClusNum(char *dirname, unsigned int cluster, int flag)
 {
     tokenlist *dirTokens = get_tokens(dirname, "/");
-    return searchForDirClusNum_H(dirTokens, 0, cluster);
+    return searchForDirClusNum_H(dirTokens, 0, cluster, flag);
 }
 
-int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster)
+int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster, int flag)
 {
     if (curIdx >= dirTokens->size)
     {
@@ -663,9 +680,9 @@ int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster)
                     if (dirEntry.Attr == 16)
                     {
                         nextClus = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-                        return searchForDirClusNum_H(dirTokens, ++curIdx, nextClus);
+                        return searchForDirClusNum_H(dirTokens, ++curIdx, nextClus, flag);
                     }
-                    else
+                    else if (flag == 0)
                     {
                         printf("error: %s is not a directory\n", dirname);
                         return -1;
@@ -673,7 +690,6 @@ int searchForDirClusNum_H(tokenlist *dirTokens, int curIdx, int cluster)
                 }
             }
         }
-        printf("error: %s does not exist\n", dirname);
         return -1;
     }
 }
@@ -704,23 +720,34 @@ void rm(char *filename)
 
     //STEP 1 check if file is in directory and erase
     DIRENTRY dirEntry;
-    lseek(fatFD, CurDataSec, SEEK_SET);
-    bool found = false;
+    int found = 0;
     int filesize = dirEntry.FileSize;
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
     {
-        //Move Data to DirEntry
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+
+        lseek(fatFD, dataSec, SEEK_SET);
+
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            lseek(fatFD, -32, SEEK_CUR);        //Seek 32 bytes back
-            write(fatFD, &EMPTY_DIRECTORY, 32); //Write empty directory
-            found = true;
-            break;
+            //Move Data to DirEntry
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+            {
+                lseek(fatFD, -32, SEEK_CUR);        //Seek 32 bytes back
+                write(fatFD, &EMPTY_DIRECTORY, 32); //Write empty directory
+                found = 1;
+                break;
+            }
         }
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
     }
 
-    if (!found)
+    if (found == 0)
     {
         printf("File Not found\n");
         return;
@@ -731,13 +758,14 @@ void rm(char *filename)
         printf("Cannot rm a directory, we may implement `rm -r <dir>` in the future\n");
         return;
     }
+    filesize = dirEntry.FileSize;
 
     //STEP 2 Clean out fat
     unsigned int fat_cluster = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
     unsigned int sector = getDataSecForClus(fat_cluster);
-    unsigned int fat_address = clusterToFatAddress(fat_cluster);
-    unsigned int fatEntry;
 
+    unsigned int fatEntry;
+    fat_address = clusterToFatAddress(fat_cluster);
     lseek(fatFD, fat_address, SEEK_SET);
     read(fatFD, &fatEntry, sizeof(fatEntry));
     int delete_size = filesize / 32;
@@ -751,6 +779,7 @@ void rm(char *filename)
             for (int i = 0; i < filesize; i++)
             {
                 write(fatFD, &EMPTY_BYTE, 1); //Write empty byte
+
                 filesize -= 1;
             }
         }
@@ -769,6 +798,7 @@ void rm(char *filename)
 
         //Move to next cluster
         sector = getDataSecForClus(fatEntry);
+
         fat_address = clusterToFatAddress(fatEntry);
         lseek(fatFD, fat_address, SEEK_SET);
         read(fatFD, &fatEntry, sizeof(fatEntry));
@@ -912,7 +942,7 @@ void lseekFAT(tokenlist *tokens)
     printf("File Not Open\n");
 }
 
-char *readFile(tokenlist *tokens, char *filen, int flag)
+char *readFAT(tokenlist *tokens, char *filen, int flag)
 {
 
     DIRENTRY dirEntry;
@@ -944,6 +974,8 @@ char *readFile(tokenlist *tokens, char *filen, int flag)
             unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
             if (dirEntry.Attr == 16)
             {
+                printf("READ ");
+
                 printf("Cannot Read Directory\n");
                 return;
             }
@@ -1072,7 +1104,7 @@ char *readFile(tokenlist *tokens, char *filen, int flag)
     return bufferText;
 }
 
-void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
+void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag)
 {
     DIRENTRY dirEntry;
 
@@ -1085,13 +1117,13 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
         filename = tokens->items[1];
         size = atoi(tokens->items[2]);
     }
-    else
+
+    if (flag == 1)
     {
         filename = filen;
         size = strlen(newText);
     }
-
-    int dataSec = getDataSecForClus(CurClus);
+    int dataSec = getDataSecForClus(cluster);
     char *buffer;
     if (flag == 0)
     {
@@ -1117,6 +1149,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
 
             if (dirEntry.Attr == 16)
             {
+                printf("WRITE ");
                 printf("Cannot Read Directory\n");
                 return;
             }
@@ -1151,7 +1184,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
             }
             else if (flag == 1)
             {
-                printf("File Found %s\n", filename);
                 lseek(fatFD, -4, SEEK_CUR);
                 write(fatFD, &size, 4);
                 //Need to find file first cluster
@@ -1162,7 +1194,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
         if (found == 1)
             break;
     }
-    if (found != 1)
+    if (found != 1 && flag == 0)
     {
         printf("File Not Open\n");
         return;
@@ -1173,12 +1205,10 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
     if (flag == 0)
     {
         working_cluster = file.first_cluster;
-        printf("Cluster Num %i\n", working_cluster);
     }
     else if (flag == 1)
     {
         working_cluster = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-        printf("Cluster Convert Num %i\n", working_cluster);
     }
     //set pointer offset
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
@@ -1220,7 +1250,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
 
     while (bytes_remain > 0)
     {
-
         unsigned int dataSec = getDataSecForClus(working_cluster) + byte_offset;
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
 
@@ -1243,20 +1272,17 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
         unsigned int fat_address = clusterToFatAddress(working_cluster);
         lseek(fatFD, fat_address, SEEK_SET);
         read(fatFD, &working_cluster, sizeof(dirEntry));
-
         if (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && bytes_remain > 0)
         {
             unsigned int cluster_cpy = working_cluster;
             //Check if need to go to next cluster
-            while ((working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+            while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
             {
-                printf("1\n");
                 cluster_cpy = working_cluster;
                 fat_address = clusterToFatAddress(working_cluster);
                 lseek(fatFD, fat_address, SEEK_SET);
                 read(fatFD, &working_cluster, sizeof(dirEntry));
             }
-
             unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec) / BootSec.SecPerClus;
             unsigned int fat_entry;
             unsigned int fat_write_address;
@@ -1266,8 +1292,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
             int i = 0;
             while (i < cluster_count)
             {
-                printf("2\n");
-
                 fat_write_address = clusterToFatAddress(i);
                 lseek(fatFD, fat_write_address, SEEK_SET);
                 read(fatFD, &fat_entry, sizeof(fat_entry));
@@ -1289,12 +1313,41 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, int flag)
     }
 }
 
-int cp(tokenlist *tokens)
+int cp(tokenlist *tokens, int isRemove)
 {
     char *filename = tokens->items[1];
     char *desination = tokens->items[2];
-    char *bufferText = readFile(tokens, filename, 1);
-    create(desination, 0, CurClus);
-    writeFAT(tokens, desination, bufferText, 1);
+    //Parse desination cluster
+    char delim[] = "/";
+
+    tokenlist *pathList = get_tokens(desination, "/");
+
+    unsigned int tmpCluster = CurClus;
+    int isPath = 0;
+    for (int i = 0; i < pathList->size; i++)
+    {
+        cd(pathList->items[i], 1);
+        isPath++;
+    }
+
+    unsigned int destinationClust = CurClus;
+    CurClus = tmpCluster;
+
+    char *bufferText = readFAT(tokens, filename, 1);
+    if (isPath > 1) //Naming Based on if is path or not
+    {
+        create(filename, 0, destinationClust);
+        writeFAT(tokens, filename, bufferText, destinationClust, 1);
+    }
+    else
+    {
+        create(desination, 0, destinationClust);
+        writeFAT(tokens, desination, bufferText, destinationClust, 1);
+    }
+
+    if (isRemove == 1)
+    {
+        rm(filename);
+    }
 }
 
