@@ -1156,60 +1156,74 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     int found = 0;
     int offset = 0;
     unsigned int cluster_num;
-    lseek(fatFD, dataSec, SEEK_SET);
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && found == 0)
     {
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+        lseek(fatFD, dataSec, SEEK_SET);
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+            {
+                cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
 
-            if (dirEntry.Attr == 16)
-            {
-                printf("WRITE ");
-                printf("Cannot Read Directory\n");
-                return;
-            }
-            if (flag == 0)
-            {
-                for (int j = 0; j < fileListSize; j++)
+                if (dirEntry.Attr == 16)
                 {
-                    if (openFilelist[j].first_cluster == cluster_num)
+                    printf("WRITE ");
+                    printf("Cannot Read Directory\n");
+                    return;
+                }
+                if (flag == 0)
+                {
+                    for (int j = 0; j < fileListSize; j++)
                     {
-                        if (openFilelist[j].mode == READ)
+                        if (openFilelist[j].first_cluster == cluster_num)
                         {
-                            printf("File not in write mode\n");
-                            return;
-                        }
+                            if (openFilelist[j].mode == READ)
+                            {
+                                printf("File not in write mode\n");
+                                return;
+                            }
 
-                        if (openFilelist[j].offset + size > dirEntry.FileSize)
-                        {
-                            //Expand Size
-                            unsigned int newSize = file.offset + size;
+                            if (openFilelist[j].offset + size > dirEntry.FileSize)
+                            {
+                                //Expand Size
+                                unsigned int newSize = file.offset + size;
 
-                            lseek(fatFD, -4, SEEK_CUR);
-                            write(fatFD, &newSize, 4);
+                                lseek(fatFD, -4, SEEK_CUR);
+                                write(fatFD, &newSize, 4);
+                            }
+                            fileSize = dirEntry.FileSize;
+                            file = openFilelist[j];
+                            offset = file.offset;
+                            openFilelist[j].offset = offset + size;
+                            found = 1;
+                            break;
                         }
-                        fileSize = dirEntry.FileSize;
-                        file = openFilelist[j];
-                        offset = file.offset;
-                        openFilelist[j].offset = offset + size;
-                        found = 1;
-                        break;
                     }
                 }
+                else if (flag == 1)
+                {
+                    lseek(fatFD, -4, SEEK_CUR);
+                    write(fatFD, &size, 4);
+                    //Need to find file first cluster
+                    found = 1;
+                    offset = 0;
+                }
             }
-            else if (flag == 1)
-            {
-                lseek(fatFD, -4, SEEK_CUR);
-                write(fatFD, &size, 4);
-                //Need to find file first cluster
-                found = 1;
-                offset = 0;
-            }
+            if (found == 1)
+                break;
         }
-        if (found == 1)
-            break;
+
+        if (found == 0)
+        {
+            fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
+        }
     }
     if (found != 1 && flag == 0)
     {
@@ -1218,7 +1232,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     }
 
     unsigned int bytes_remain = size;
-    unsigned int working_cluster;
     if (flag == 0)
     {
         working_cluster = file.first_cluster;
