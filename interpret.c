@@ -727,7 +727,6 @@ void rm(char *filename)
     while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
     {
         unsigned int dataSec = getDataSecForClus(working_cluster);
-
         lseek(fatFD, dataSec, SEEK_SET);
 
         for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
@@ -833,47 +832,55 @@ void openFile(tokenlist *tokens)
         printf("Invalid mode. Supported modes are `r`, `w`, or `rw`\n");
     }
 
-    int dataSec = getDataSecForClus(CurClus);
-    lseek(fatFD, dataSec, SEEK_SET);
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
     {
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+        lseek(fatFD, dataSec, SEEK_SET);
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            if (dirEntry.Attr == 16)
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
             {
-                printf("Cannot open a directory\n");
-                return;
-            }
-            if ((mode_val == 1 || mode_val == 2) && dirEntry.Attr == 1)
-            { //Not sure if I am correctly checking the type as read only
-                printf("Cannot open read only file in `%s` mode", mode);
-                return;
-            }
-
-            int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-            for (int j = 0; j < fileListSize; j++)
-            {
-                if (openFilelist[i].first_cluster == cluster_num)
+                if (dirEntry.Attr == 16)
                 {
-                    printf("File is already open\n");
+                    printf("Cannot open a directory\n");
                     return;
                 }
+                if ((mode_val == 1 || mode_val == 2) && dirEntry.Attr == 1)
+                { //Not sure if I am correctly checking the type as read only
+                    printf("Cannot open read only file in `%s` mode", mode);
+                    return;
+                }
+
+                int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+                for (int j = 0; j < fileListSize; j++)
+                {
+                    if (openFilelist[i].first_cluster == cluster_num)
+                    {
+                        printf("File is already open\n");
+                        return;
+                    }
+                }
+
+                //All checks have passed and file is found
+                File_Entry newFileEntry;
+                newFileEntry.first_cluster = cluster_num;
+                newFileEntry.mode = mode_val;
+                newFileEntry.offset = 0;
+
+                //This may need to be reworked after close is added. A good solution would be a linked list.
+                //Problem with this is files can be closed in any order so we should prob do a scan to find next open spot.
+                //Also forloop is running through the size of the array, but the array may not have the files stored in sequence;s
+                openFilelist[fileListSize] = newFileEntry;
+                fileListSize++;
+                return;
             }
-
-            //All checks have passed and file is found
-            File_Entry newFileEntry;
-            newFileEntry.first_cluster = cluster_num;
-            newFileEntry.mode = mode_val;
-            newFileEntry.offset = 0;
-
-            //This may need to be reworked after close is added. A good solution would be a linked list.
-            //Problem with this is files can be closed in any order so we should prob do a scan to find next open spot.
-            //Also forloop is running through the size of the array, but the array may not have the files stored in sequence;s
-            openFilelist[fileListSize] = newFileEntry;
-            fileListSize++;
-            return;
         }
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
     }
     printf("File not found\n");
 }
@@ -960,62 +967,73 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
         filename = filen;
     }
 
-    int dataSec = getDataSecForClus(CurClus);
     File_Entry file;
     int found = 0;
-    lseek(fatFD, dataSec, SEEK_SET);
     int offset;
     char *bufferText;
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && found == 0)
     {
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+        lseek(fatFD, dataSec, SEEK_SET);
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
         {
-            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-            if (dirEntry.Attr == 16)
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
             {
-                printf("READ ");
-
-                printf("Cannot Read Directory\n");
-                return;
-            }
-            if (flag == 0)
-            {
-
-                for (int j = 0; j < fileListSize; j++)
+                unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+                if (dirEntry.Attr == 16)
                 {
-                    if (openFilelist[j].first_cluster == cluster_num)
-                    {
-                        if (openFilelist[j].mode == WRITE)
-                        {
-                            printf("File not in read mode\n");
-                            return;
-                        }
+                    printf("READ ");
 
-                        if (openFilelist[j].offset + size > dirEntry.FileSize)
+                    printf("Cannot Read Directory\n");
+                    return;
+                }
+                if (flag == 0)
+                {
+
+                    for (int j = 0; j < fileListSize; j++)
+                    {
+                        if (openFilelist[j].first_cluster == cluster_num)
                         {
-                            printf("Offset larger then file size\n");
-                            return;
+                            if (openFilelist[j].mode == WRITE)
+                            {
+                                printf("File not in read mode\n");
+                                return;
+                            }
+
+                            if (openFilelist[j].offset + size > dirEntry.FileSize)
+                            {
+                                printf("Offset larger then file size\n");
+                                return;
+                            }
+                            file = openFilelist[j];
+                            offset = file.offset;
+                            openFilelist[j].offset = offset + size;
+                            found = 1;
+                            break;
                         }
-                        file = openFilelist[j];
-                        offset = file.offset;
-                        openFilelist[j].offset = offset + size;
-                        found = 1;
-                        break;
                     }
                 }
-            }
-            else if (flag == 1)
-            {
+                else if (flag == 1)
+                {
 
-                //Need to find file first cluster
-                found = 1;
-                size = dirEntry.FileSize;
-                offset = 0;
+                    //Need to find file first cluster
+                    found = 1;
+                    size = dirEntry.FileSize;
+                    offset = 0;
+                }
             }
+            if (found == 1)
+                break;
         }
-        if (found == 1)
-            break;
+        if (found == 0)
+        {
+            fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
+        }
     }
     if (found != 1)
     {
@@ -1024,7 +1042,6 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
     }
 
     unsigned int bytes_remain = size;
-    unsigned int working_cluster;
     if (flag == 0)
     {
         working_cluster = file.first_cluster;
