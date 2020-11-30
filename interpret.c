@@ -45,7 +45,7 @@ void openFile(tokenlist *tokens);
 void closeFile(tokenlist *tokens);
 void lseekFAT(tokenlist *tokens);
 char *readFAT(tokenlist *tokens, char *filename, int flag);
-void writeFAT(tokenlist *tokens, char *filename, char *newText, unsigned int cluster, int flag);
+void writeFAT(tokenlist *tokens, char *filename, char *newText, unsigned int cluster, int flag = 0);
 int cp(tokenlist *tokens, int isRemove);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                          /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
@@ -922,29 +922,40 @@ void lseekFAT(tokenlist *tokens)
     DIRENTRY dirEntry;
     char *filename = tokens->items[1];
     int offset = atoi(tokens->items[2]);
-    int dataSec = getDataSecForClus(CurClus);
-    lseek(fatFD, dataSec, SEEK_SET);
-    for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
-    {
-        read(fatFD, &dirEntry, sizeof(DIRENTRY));
-        if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
-        {
-            unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-            for (int j = 0; j < fileListSize; j++)
-            {
-                if (openFilelist[j].first_cluster == cluster_num)
-                {
 
-                    if (offset > dirEntry.FileSize)
+    unsigned int working_cluster = CurClus;
+    unsigned int fat_address;
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+    {
+        unsigned int dataSec = getDataSecForClus(working_cluster);
+        lseek(fatFD, dataSec, SEEK_SET);
+        for (int i = 0; i * sizeof(DIRENTRY) < BootSec.BytesPerSec; i++)
+        {
+            read(fatFD, &dirEntry, sizeof(DIRENTRY));
+            if (strncmp(dirEntry.Name, filename, strlen(filename)) == 0)
+            {
+                unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
+                for (int j = 0; j < fileListSize; j++)
+                {
+                    if (openFilelist[j].first_cluster == cluster_num)
                     {
-                        printf("Offset larger then file size\n");
+
+                        if (offset > dirEntry.FileSize)
+                        {
+                            printf("Offset larger then file size\n");
+                            return;
+                        }
+                        printf("Setting File: %s offset %i\n", filename, offset);
+                        openFilelist[j].offset = offset;
                         return;
                     }
-                    openFilelist[j].offset = offset;
-                    return;
                 }
             }
         }
+        printf("Hitter\n");
+        fat_address = clusterToFatAddress(working_cluster);
+        lseek(fatFD, fat_address, SEEK_SET);
+        read(fatFD, &working_cluster, sizeof(dirEntry));
     }
     printf("File Not Open\n");
 }
@@ -1057,7 +1068,7 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
     unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
-
+    printf("Offset: %i\tByte Offset: %i\n", offset, byte_offset);
     while (cluster_offset != 0)
     {
 
@@ -1080,31 +1091,37 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
             byte_offset = 0;
             if (working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF)
             {
-                //printf("Working Cluster %x\n", working_cluster);
+                printf("Working Cluster %x\n", working_cluster);
                 break;
             }
         }
 
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
+        printf("dataSec %x\n", getDataSecForClus(working_cluster));
 
         if (cluster_size - byte_offset >= bytes_remain)
         {
             char string[bytes_remain];
             read(fatFD, &string, bytes_remain);
-            //string[bytes_remain] = '\0';
+            string[bytes_remain] = '\0';
             bytesRead += bytes_remain;
             bytes_remain -= bytes_remain;
-            strcat(bufferText, string);
+            if (flag == 0)
+            {
+                printf("%s", string);
+            }
         }
         else
         {
             char string[cluster_size - byte_offset];
             read(fatFD, &string, cluster_size - byte_offset);
-            //string[cluster_size - byte_offset] = '\0';
+            string[cluster_size - byte_offset] = '\0';
             bytesRead += cluster_size - byte_offset;
             bytes_remain -= cluster_size - byte_offset;
-
-            strcat(bufferText, string);
+            if (flag == 0)
+            {
+                printf("%s", string);
+            }
         }
 
         byte_offset = 0;
@@ -1113,15 +1130,10 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
         read(fatFD, &working_cluster, sizeof(dirEntry));
     }
 
-    bufferText[bytesRead] = '\0';
-    if (flag == 0)
-    {
-        printf("%s", bufferText);
-    }
     return bufferText;
 }
 
-void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag)
+void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag = 0)
 {
     DIRENTRY dirEntry;
 
@@ -1150,6 +1162,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     {
         buffer = newText;
     }
+    printf("Buffer: %s\n", buffer);
     unsigned int fileSize;
     File_Entry file;
 
@@ -1192,15 +1205,17 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
                             {
                                 //Expand Size
                                 unsigned int newSize = file.offset + size;
-
+                                fileSize = newSize;
                                 lseek(fatFD, -4, SEEK_CUR);
                                 write(fatFD, &newSize, 4);
                             }
-                            fileSize = dirEntry.FileSize;
+                            if (fileSize == 0)
+                                fileSize = dirEntry.FileSize;
                             file = openFilelist[j];
                             offset = file.offset;
-                            openFilelist[j].offset = offset + size;
+                            openFilelist[j].offset = openFilelist[j].offset + size;
                             found = 1;
+                            printf("Offset: %i\n", offset);
                             break;
                         }
                     }
@@ -1244,6 +1259,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
     unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
+    printf("Offset: %i\tByte Offset: %i\tCluster Offset: %i\n", offset, byte_offset, cluster_offset);
 
     while (cluster_offset != 0)
     {
@@ -1281,6 +1297,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     while (bytes_remain > 0)
     {
         unsigned int dataSec = getDataSecForClus(working_cluster) + byte_offset;
+        printf("dataSec %x\n", dataSec);
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
 
         if (cluster_size - byte_offset >= bytes_remain)
@@ -1304,6 +1321,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
         read(fatFD, &working_cluster, sizeof(dirEntry));
         if (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && bytes_remain > 0)
         {
+            printf("Hit\n");
             unsigned int cluster_cpy = working_cluster;
             //Check if need to go to next cluster
             while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
