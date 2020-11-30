@@ -723,7 +723,7 @@ void rm(char *filename)
     int filesize = 0;
     unsigned int working_cluster = CurClus;
     unsigned int fat_address;
-    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
+    while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && found == 0)
     {
         unsigned int dataSec = getDataSecForClus(working_cluster);
         lseek(fatFD, dataSec, SEEK_SET);
@@ -741,9 +741,12 @@ void rm(char *filename)
                 break;
             }
         }
-        fat_address = clusterToFatAddress(working_cluster);
-        lseek(fatFD, fat_address, SEEK_SET);
-        read(fatFD, &working_cluster, sizeof(dirEntry));
+        if (found == 0)
+        {
+            fat_address = clusterToFatAddress(working_cluster);
+            lseek(fatFD, fat_address, SEEK_SET);
+            read(fatFD, &working_cluster, sizeof(dirEntry));
+        }
     }
 
     if (found == 0)
