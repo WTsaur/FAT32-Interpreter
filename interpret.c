@@ -34,7 +34,7 @@ struct File_Entry
 #define WRITE 1
 #define READ_WRITE 2
 
-struct File_Entry *headFileNode = NULL; //We can make this a linked list if we want it dynamic
+struct File_Entry *headFileNode = NULL; 
 struct File_Entry *currFileNode = NULL;
 struct File_Entry *nextFileNode = NULL;
 
@@ -97,8 +97,6 @@ int main(int argc, char *argv[])
 
     //This stores the currrent directory. Intialize to root. (ReserveCount+(#Fat * FatSize)) * bytesPerSector
     CurDataSec = getDataSecForClus(CurClus);
-
-    // printf("%i\n", CurDataSec);
 
     while (1)
     {
@@ -483,11 +481,8 @@ void ls(tokenlist *tokens, int flag = 0)
             if (strlen(dirEntry.Name) > 0 && (dirEntry.Attr == 32 || dirEntry.Attr == 16))
             {
                 printf("%s\n", dirEntry.Name);
-                // printf("Type: %i\n", dirEntry.Attr);
             }
 
-            // printf("Directory Offset %i\n", CurDataSec);
-            // printf("Size: %i\n", dirEntry.FileSize);
         }
 
         fat_address = clusterToFatAddress(working_cluster);
@@ -914,14 +909,12 @@ void closeFile(tokenlist *tokens)
             struct File_Entry *temp = headFileNode;
             if (n != NULL && n->first_cluster == cluster_num)
             {
-                printf("1");
                 if (n->next == NULL)
                 {
                     headFileNode = NULL;
                     return;
                 }
                 headFileNode = n->next;
-                printf("2");
                 free(n);
                 return;
             }
@@ -1023,8 +1016,6 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
                 unsigned int cluster_num = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
                 if (dirEntry.Attr == 16)
                 {
-                    printf("READ ");
-
                     printf("Cannot Read Directory\n");
                     return;
                 }
@@ -1096,7 +1087,6 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
     unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
-    printf("Offset: %i\tByte Offset: %i\n", offset, byte_offset);
     while (cluster_offset != 0)
     {
 
@@ -1119,13 +1109,11 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
             byte_offset = 0;
             if (working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF)
             {
-                printf("Working Cluster %x\n", working_cluster);
                 break;
             }
         }
 
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
-        printf("dataSec %x\n", getDataSecForClus(working_cluster));
 
         if (cluster_size - byte_offset >= bytes_remain)
         {
@@ -1228,6 +1216,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
                                 printf("File not in write mode\n");
                                 return;
                             }
+                            file = n;
 
                             if (n->offset + size > dirEntry.FileSize)
                             {
@@ -1239,7 +1228,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
                             }
                             if (fileSize == 0)
                                 fileSize = dirEntry.FileSize;
-                            file = n;
                             offset = file->offset;
                             n->offset = n->offset + size;
                             found = 1;
@@ -1287,7 +1275,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     unsigned int cluster_offset = offset / BootSec.BytesPerSec; //Number of cluster from start
     unsigned int byte_offset = offset % BootSec.BytesPerSec;
     unsigned int cluster_size = BootSec.BytesPerSec * BootSec.SecPerClus;
-    printf("Offset: %i\tByte Offset: %i\tCluster Offset: %i\n", offset, byte_offset, cluster_offset);
 
     while (cluster_offset != 0)
     {
@@ -1325,7 +1312,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     while (bytes_remain > 0)
     {
         unsigned int dataSec = getDataSecForClus(working_cluster) + byte_offset;
-        printf("dataSec %x\n", dataSec);
         lseek(fatFD, getDataSecForClus(working_cluster) + byte_offset, SEEK_SET);
 
         if (cluster_size - byte_offset >= bytes_remain)
@@ -1340,8 +1326,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
             bytes_remain -= cluster_size - offset;
             bytesWrite += cluster_size - offset;
         }
-        //printf("Bytes Remain %i\n", bytes_remain);
-        //printf("Bytes Offset %i\n", byte_offset);
+
 
         byte_offset = 0;
         unsigned int fat_address = clusterToFatAddress(working_cluster);
@@ -1349,7 +1334,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
         read(fatFD, &working_cluster, sizeof(dirEntry));
         if (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && bytes_remain > 0)
         {
-            printf("Hit\n");
             unsigned int cluster_cpy = working_cluster;
             //Check if need to go to next cluster
             while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
