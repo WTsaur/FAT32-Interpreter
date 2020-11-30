@@ -34,7 +34,7 @@ struct File_Entry
 #define WRITE 1
 #define READ_WRITE 2
 
-struct File_Entry *headFileNode = NULL; 
+struct File_Entry *headFileNode = NULL;
 struct File_Entry *currFileNode = NULL;
 struct File_Entry *nextFileNode = NULL;
 
@@ -404,6 +404,7 @@ int create(char *filename, int isDirectory, unsigned int cluster)
         lseek(fatFD, new_loc + 32, SEEK_SET);
         write(fatFD, &dot2Directory, sizeof(DIRENTRY));
     }
+    return 1;
 }
 void size(tokenlist *tokens)
 {
@@ -412,7 +413,7 @@ void size(tokenlist *tokens)
 
     DIRENTRY dirEntry;
     int found = 0;
-    int filesize = dirEntry.FileSize;
+    int filesize = 0;
     unsigned int working_cluster = CurClus;
     unsigned int fat_address;
     while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
@@ -482,7 +483,6 @@ void ls(tokenlist *tokens, int flag = 0)
             {
                 printf("%s\n", dirEntry.Name);
             }
-
         }
 
         fat_address = clusterToFatAddress(working_cluster);
@@ -720,7 +720,7 @@ void rm(char *filename)
     //STEP 1 check if file is in directory and erase
     DIRENTRY dirEntry;
     int found = 0;
-    int filesize = dirEntry.FileSize;
+    int filesize = 0;
     unsigned int working_cluster = CurClus;
     unsigned int fat_address;
     while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF))
@@ -1079,7 +1079,7 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
     else if (flag == 1)
     {
         working_cluster = HiLoClusConvert(dirEntry.FstClusHI, dirEntry.FstClusLO);
-        bufferText = malloc(dirEntry.FileSize);
+        bufferText = (char *)malloc(dirEntry.FileSize);
         bufferText[0] = '\0';
     }
 
@@ -1126,6 +1126,10 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
             {
                 printf("%s", string);
             }
+            else
+            {
+                strcat(bufferText, string);
+            }
         }
         else
         {
@@ -1138,6 +1142,10 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
             {
                 printf("%s", string);
             }
+            else
+            {
+                strcat(bufferText, string);
+            }
         }
 
         byte_offset = 0;
@@ -1146,7 +1154,15 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
         read(fatFD, &working_cluster, sizeof(dirEntry));
     }
 
-    return bufferText;
+    if (flag == 1)
+    {
+        bufferText[bytesRead + 1] = '\0';
+        return bufferText;
+    }
+    else
+    {
+        return "";
+    }
 }
 
 void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag = 0)
@@ -1160,13 +1176,11 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     if (flag == 0)
     {
         filename = tokens->items[1];
-        size = atoi(tokens->items[2]);
     }
 
     if (flag == 1)
     {
         filename = filen;
-        size = strlen(newText);
     }
     int dataSec = getDataSecForClus(cluster);
     char *buffer;
@@ -1185,7 +1199,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     int offset = 0;
     unsigned int cluster_num;
 
-    unsigned int working_cluster = CurClus;
+    unsigned int working_cluster = cluster;
     unsigned int fat_address;
     while (!(working_cluster == 0x0FFFFFF8 || working_cluster == 0x0FFFFFFF) && found == 0)
     {
@@ -1205,6 +1219,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
                 }
                 if (flag == 0)
                 {
+                    size = atoi(tokens->items[2]);
 
                     struct File_Entry *n = headFileNode;
                     while (n != NULL)
@@ -1238,11 +1253,15 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
                 }
                 else if (flag == 1)
                 {
+                    size = strlen(newText);
+
                     lseek(fatFD, -4, SEEK_CUR);
                     write(fatFD, &size, 4);
                     //Need to find file first cluster
+
                     found = 1;
                     offset = 0;
+                    break;
                 }
             }
             if (found == 1)
@@ -1262,7 +1281,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
         return;
     }
 
-    unsigned int bytes_remain = size;
     if (flag == 0)
     {
         working_cluster = file->first_cluster;
@@ -1286,7 +1304,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     }
 
     int bytesWrite = 0;
-    char *buffer_expand = malloc(size);
+    char *buffer_expand = (char *)malloc(size);
 
     if (size > strlen(buffer))
     {
@@ -1309,6 +1327,7 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
     }
     buffer_expand[size] = '\0';
 
+    int bytes_remain = size;
     while (bytes_remain > 0)
     {
         unsigned int dataSec = getDataSecForClus(working_cluster) + byte_offset;
@@ -1326,7 +1345,6 @@ void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluste
             bytes_remain -= cluster_size - offset;
             bytesWrite += cluster_size - offset;
         }
-
 
         byte_offset = 0;
         unsigned int fat_address = clusterToFatAddress(working_cluster);
