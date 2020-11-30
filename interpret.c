@@ -1448,7 +1448,6 @@ int cp(tokenlist *tokens, int isRemove)
         isPath++;
         if (strcmp(pathList->items[i], ".") == 0 || strcmp(pathList->items[i], "..") == 0){
             isPath = 2;
-            printf("ispath\n");
         }
 
         if (res == -1)
