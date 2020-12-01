@@ -1191,7 +1191,9 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
         byte_offset = 0;
         unsigned int fat_address = clusterToFatAddress(working_cluster);
         lseek(fatFD, fat_address, SEEK_SET);
+        unsigned int bytes_remain_buffer = bytes_remain;
         read(fatFD, &working_cluster, sizeof(dirEntry));
+        bytes_remain = bytes_remain_buffer;
     }
 
     if (flag == 1)
@@ -1470,8 +1472,16 @@ int cp(tokenlist *tokens, int isRemove)
     }
     else
     {
-        create(desination, 0, destinationClust);
-        writeFAT(tokens, desination, bufferText, destinationClust, 1);
+        if (CurClus == destinationClust)
+        {
+            create(desination, 0, destinationClust);
+            writeFAT(tokens, desination, bufferText, destinationClust, 1);
+        }
+        else
+        {
+            create(filename, 0, destinationClust);
+            writeFAT(tokens, filename, bufferText, destinationClust, 1);
+        }
     }
 
     if (isRemove == 1)
@@ -1479,4 +1489,3 @@ int cp(tokenlist *tokens, int isRemove)
         rm(filename);
     }
 }
-
