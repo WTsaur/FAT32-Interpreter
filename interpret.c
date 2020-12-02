@@ -364,7 +364,6 @@ int create(char *filename, int isDirectory, unsigned int cluster)
     }
     if (found == 1)
     {
-        //Hopefully this works
         lseek(fatFD, data_write_location, SEEK_SET);
         write(fatFD, &dirEntry, sizeof(DIRENTRY));
     }
@@ -891,7 +890,7 @@ void openFile(tokenlist *tokens)
                     return;
                 }
                 if ((mode_val == 1 || mode_val == 2) && dirEntry.Attr == 1)
-                { //Not sure if I am correctly checking the type as read only
+                {
                     printf("Cannot open read only file in `%s` mode", mode);
                     return;
                 }
