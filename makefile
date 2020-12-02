@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -fpermissive
+CFLAGS = -Wall -g
 #List of dependencies (.h)
 DEPS = BPB.h DIRENTRY.h
 #List of object files (.o)
