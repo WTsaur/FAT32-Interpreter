@@ -39,7 +39,7 @@ struct File_Entry *currFileNode = NULL;
 struct File_Entry *nextFileNode = NULL;
 
 void printInfo();
-void ls(tokenlist *token, int flag = 0);
+void ls(tokenlist *token, int flag);
 void size(tokenlist *tokens);
 int cd(char *path, int flag);
 void rm(char *filename);
@@ -47,7 +47,7 @@ void openFile(tokenlist *tokens);
 void closeFile(tokenlist *tokens);
 void lseekFAT(tokenlist *tokens);
 char *readFAT(tokenlist *tokens, char *filename, int flag);
-void writeFAT(tokenlist *tokens, char *filename, char *newText, unsigned int cluster, int flag = 0);
+void writeFAT(tokenlist *tokens, char *filename, char *newText, unsigned int cluster, int flag);
 int cp(tokenlist *tokens, int isRemove);
 void trimStringRight(char *str);
 int HiLoClusConvert(unsigned short HI, unsigned short LO);                          /* converts DIRENTRY's FstClusHi and FstClusLo to a cluster number */
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
         else if (strcmp(command, "ls") == 0)
         {
             if (tokens->size < 3)
-                ls(tokens);
+                ls(tokens, 0);
             else
                 printf("error: usage: ls <DIR NAME>\n");
         }
@@ -469,7 +469,7 @@ void size(tokenlist *tokens)
     printf("File Not Found\n");
 }
 
-void ls(tokenlist *tokens, int flag = 0)
+void ls(tokenlist *tokens, int flag)
 {
     unsigned int working_cluster = CurClus;
     unsigned int fat_address;
@@ -1207,7 +1207,7 @@ char *readFAT(tokenlist *tokens, char *filen, int flag)
     }
 }
 
-void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag = 0)
+void writeFAT(tokenlist *tokens, char *filen, char *newText, unsigned int cluster, int flag)
 {
     DIRENTRY dirEntry;
 

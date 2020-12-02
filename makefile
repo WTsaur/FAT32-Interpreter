@@ -1,5 +1,5 @@
-CC = g++
-CFLAGS = -Wall -g -std=c++11 -fpermissive
+CC = gcc
+CFLAGS = -Wall -g -fpermissive
 #List of dependencies (.h)
 DEPS = BPB.h DIRENTRY.h
 #List of object files (.o)
