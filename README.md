@@ -28,4 +28,7 @@
 * implemented 'size'
 
 ## Michael Styron
-* 
+* implemented 'cp'
+* implemented 'mv'
+* testing
+* bug fixes
