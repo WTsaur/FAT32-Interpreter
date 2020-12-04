@@ -32,3 +32,6 @@
 * implemented 'mv'
 * testing
 * bug fixes
+
+# Notes:
+* mv command cannot move directories (instances in which FROM == a dir entry)
