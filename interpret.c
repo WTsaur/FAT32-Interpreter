@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
         {
             if (tokens->size != 3)
             {
-                printf("error: usage cp <FILE NAME> <Desination>");
+                printf("error: usage mv <FROM> <TO>\n");
             }
             else
             {
@@ -226,16 +226,12 @@ int main(int argc, char *argv[])
         {
             if (tokens->size != 3)
             {
-                printf("error: usage cp <FILE NAME> <Desination>");
+                printf("error: usage cp <FILE NAME> <TO>\n");
             }
             else
             {
                 cp(tokens, 0);
             }
-        }
-        else if (strcmp(command, "rmdir") == 0)
-        {
-            //rmdir();
         }
         else if (strcmp(command, "exit") == 0)
         {
@@ -307,7 +303,7 @@ int create(char *filename, int isDirectory, unsigned int cluster)
     unsigned int fat_entry;
     unsigned int data_write_location;
     unsigned int fat_write_address;
-    unsigned int fat_cluster;
+    unsigned int fat_cluster = 0;
     int found = 0;
 
     while (i < cluster_count)
@@ -384,7 +380,7 @@ int create(char *filename, int isDirectory, unsigned int cluster)
         unsigned int cluster_count = (BootSec.TotSec32 - (BootSec.RsvdSecCnt + (BootSec.NumFATs * BootSec.FATSz32)) * BootSec.BytesPerSec) / BootSec.SecPerClus;
         unsigned int fat_entry;
         unsigned int fat_write_address;
-        unsigned int fat_cluster;
+        unsigned int fat_cluster = 0;
         unsigned int FREE_CLUSTER = 0x00000000;
         unsigned int FAT_END = 0x0FFFFFF8;
         int i = 0;
