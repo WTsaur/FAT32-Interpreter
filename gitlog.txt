@@ -1,0 +1,400 @@
+commit 6e18622b0fc90c1d99cebc264b6256e2bcd178d0
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Dec 3 16:10:18 2020 -0800
+
+    Updated README to include a note regarding mv's inability to move directories
+
+commit e760ca754254dd253a85d48b4a19262a2c9cff9b
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Dec 3 16:06:52 2020 -0800
+
+    Fixed printing inconsistencies and fixed some compiler warnings
+
+commit 5cc61bc3a835de9cccc870e592275f0e487a7e1f
+Author: Michael Styron <mts17b@my.fsu.edu>
+Date:   Thu Dec 3 18:12:23 2020 -0500
+
+    Updated README
+
+commit fe63d27130aaaabfa4b34b08b5bc165f95303090
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Wed Dec 2 11:36:36 2020 -0800
+
+    Removed unneeded comments
+
+commit a11396c0259e20c847455f576e31ab4a046379f3
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Wed Dec 2 10:44:10 2020 -0500
+
+    Cleanup Bugs
+
+commit b2b582c10075e848e19d0a096a8e2bc2c344de75
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Wed Dec 2 09:43:58 2020 -0500
+
+    Update code to use gcc
+
+commit 96f1644d6dff513a7710c0fc2949f534fead6234
+Author: Michael Styron <mts17b@my.fsu.edu>
+Date:   Mon Nov 30 21:08:11 2020 -0500
+
+    Bug fixes
+    
+    -fixed readFile() - would cause seg fault when run
+    -fixed cp - wouldn't be able to read certain files correctly
+
+commit 7132b172667283ec91d6f21bb04ab74ae412182b
+Merge: 00c93b8 a41cbc7
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 17:44:27 2020 -0500
+
+    fix things
+
+commit 00c93b862a45bfd6ef43db88578db644ab8814fa
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 17:39:05 2020 -0500
+
+    fix random things that didnt work
+
+commit 4774d4eb8241ba7e28585585a63a250ab70c23c9
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 16:28:10 2020 -0500
+
+    fix rm errrors
+
+commit a8a8b4a2d17073592b818e99d36e2dcf6c6fffda
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 16:20:39 2020 -0500
+
+    Fix issues with cp
+
+commit e794d71232e6993083529e141eae944c1b5c3ac2
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 15:03:26 2020 -0500
+
+    Cleanup debug logging
+
+commit 641e15500c25a377e46117543d43007e5d08b07f
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 14:23:38 2020 -0500
+
+    Turn fileList into linked list
+
+commit 15d2e6d205e667b73380264a602702ab3f95770b
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Mon Nov 30 12:10:50 2020 -0500
+
+    fix bugs in read/write location
+
+commit 7f958755f612cf9d47dd8ef6d92c86827407ff86
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 29 17:31:11 2020 -0500
+
+    fix cluster convert write
+
+commit 05a50ad013af169d81b61d3cafaa2f7157ac166f
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 29 17:17:07 2020 -0500
+
+    fix read and open traversing clusters
+
+commit 50bac8701546b4405b103d3fa02188436d4d262e
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 29 16:58:59 2020 -0500
+
+    fix cp, implement mv, fix changes to rm not searching every cluster
+
+commit a41cbc76cf8e7ffbbae625f69eea1e69277204e5
+Author: Michael Styron <mts17b@my.fsu.edu>
+Date:   Fri Nov 27 13:26:45 2020 -0500
+
+    worked on cp
+    
+    -worked on but not tested cp
+    -readFile bugs found that need to be fixed before testing
+
+commit 4d9cf257d9ebf44049b2bfabfca3319f5f623ef8
+Merge: b5bd85f b7855dc
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 22 16:48:32 2020 -0500
+
+    Merge
+
+commit b5bd85f4649bd82eb17d5ff3c8b0b4a4eff9ba6c
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 22 16:31:45 2020 -0500
+
+    Add mv, fix creat paths
+
+commit b7855dc31ddc8805b18e32287e0742580db48599
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sun Nov 22 10:40:19 2020 -0800
+
+    merged Nick_Branch with Main; fixed function names conflicting with C library functions; removed instance of bool in rm()
+
+commit 2172ff3c77bee2dc75c5e8ca88381cec16ac9810
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Mon Nov 16 20:35:41 2020 -0800
+
+    Updated README.md contributions section
+
+commit f4d39e1d5ba97284b781da65cb2a34dd344045b0
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Mon Nov 16 19:57:43 2020 -0800
+
+    fixed minor errors in command validity checking; implemented size command
+
+commit 8842548c8b7e7c137093803ace55edb2f6ed2faf
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Mon Nov 16 19:24:52 2020 -0800
+
+    fixed creat function name to be file_creat to be consistent with changes made to other function names
+
+commit 2064e1617dd04bbeaf88302f3c3deac92fc40317
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Mon Nov 16 19:21:08 2020 -0800
+
+    Merged changes from Nicks_branch; fixed function naming conflicts with fcntl.h
+
+commit d876629e1f897e77dc98c5000d14ef215fd17d0e
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Mon Nov 16 16:47:34 2020 -0800
+
+    fixed some code formatting inconsistencies; updated README contribution section
+
+commit 9d9b9af99ca7e510322d5e494e5b919f2cb2c68f
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sun Nov 15 12:51:11 2020 -0500
+
+    Add  command
+
+commit ac5bf925226be9ea2d19468d18baf154683d5680
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 13:12:55 2020 -0800
+
+    updated contributions
+
+commit a448353a30accf93e75d77aebefba1825c0585d0
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 13:09:19 2020 -0800
+
+    added code to fix merge conflicts
+
+commit 5d4a12b0c65a45d08481ec11a58eb7923f8612a6
+Merge: 674ba64 f3dacad
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 12:53:00 2020 -0800
+
+    Merge branch 'main' of https://github.com/WTsaur/FAT32-Interpreter into main
+    
+    merging
+
+commit f3dacadb82fd4e2b0c05dabe07daeb3e3c54ba87
+Merge: 06deeac 68f90d8
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 15:46:13 2020 -0500
+
+    Merge branch 'Nicks_Branch' into main
+
+commit 674ba64c57b12b2a8fd67652b4f205002fffd164
+Merge: 7c853ed 98448d1
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 12:40:03 2020 -0800
+
+    Merge branch 'main' of https://github.com/WTsaur/FAT32-Interpreter into main
+
+commit 7c853ed9f52c61dc034908e03822d731b29e6b2a
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 12:39:16 2020 -0800
+
+    updated searchForDirClusNum to allow relative paths utilizing recursive helper func searchForDirClusNum_H
+
+commit 68f90d8664711f21b3cf3cab040b4b008f24ec12
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 14:57:21 2020 -0500
+
+    Implement mkdir, fix bugs
+
+commit 06deeac26466b2f5d338da56d58860a64f292ef6
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 14:54:59 2020 -0500
+
+    Implement CD, fix bugs
+
+commit 98448d18da13d9ea94316d6d525aa50dd6c21c5d
+Merge: e0e4207 d255306
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 13:10:34 2020 -0500
+
+    Merge branch 'main' of https://github.com/WTsaur/FAT32-Interpreter into main
+
+commit e0e4207eec673dc3677e8e6e6534cd8ff49f385a
+Merge: c692dd6 c0a1192
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 13:10:25 2020 -0500
+
+    Resolve Merge conflict
+
+commit d25530640119386b2a9bd4a5fcac43cf03a918c2
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 10:09:27 2020 -0800
+
+    fixed DIRENTRY.h struct declaration
+
+commit c692dd64aee11ae4f1ac55613de909507dad35b3
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 13:08:50 2020 -0500
+
+    Make creat use global vars
+
+commit c0a11920bb180ecfe23a59d82da63f2b2981de06
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 14 10:05:57 2020 -0800
+
+    updated cd command to use global vars
+
+commit 184371d809e491a3b3ff0c1eb2499ff53269a17e
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 12:43:27 2020 -0500
+
+    Cleanup creat code
+
+commit e2b7507f39b145840daf546f445d65792b90617d
+Merge: 221bdab e599059
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Sat Nov 14 12:10:17 2020 -0500
+
+    Resolve Merge Conflicts with main, add fat32 backup for testing
+
+commit 221bdab81076d0ed6b4abeaf5be43aae72f6bc36
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Fri Nov 13 21:39:02 2020 -0500
+
+    Creat filename with pad
+
+commit dd2aee971f082b15dd782ff767fe81bdcdec4dec
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Fri Nov 13 21:10:35 2020 -0500
+
+    Implment Creat
+
+commit e59905913f3d7b641e7c6a5fe130e2ace327d885
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Nov 12 19:58:03 2020 -0800
+
+    Implemented 'cd' command
+    - can now 'cd' and 'ls' through FAT img
+    - added searchForDirClusNum(DIRNAME) to handle searching through current working directory for
+      specified DIRNAME and return the cluster number for DIRNAME; returns -1 if DIRNAME does not exist
+      or if DIRNAME is not a directory
+    - ls() and cd() were simplified by using searchForDirClusNum(DIRNAME)
+
+commit be4fba00eee482996991cf84eb92ebe8c1cd1a08
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Nov 12 18:06:19 2020 -0800
+
+    'ls' implementation completed
+    
+    - globalized several variables due to their heavy usage (fatFD, CurClus, BootSec, CurDataSec)
+    - created helper function HiLoClusConv() to convert the FstHiClus and FstLoClus
+      to a cluster number that can be used to find the right data sector for a directory
+    - created getDataSecForClus() to calculate the data sector for a given cluster, N
+    - changed while loop to infinitely run with while(1)
+    - fixed seg fault regarding exit and commands that had more than 1 token
+
+commit 74b3512b86b66b7e55ee0b65e25e4c949cee10e6
+Merge: 7755545 39c0466
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Nov 12 13:21:28 2020 -0800
+
+    Merge branch 'Nicks_Branch' of https://github.com/WTsaur/FAT32-Interpreter into main
+
+commit 39c04667f1f1306bc1462e536cae182fa90ff7cf
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Thu Nov 12 16:17:45 2020 -0500
+
+    Fix missing +
+
+commit 7755545c21db58ae972f315d00041cab2adadb10
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Nov 12 13:10:29 2020 -0800
+
+    update README.md, added link to GitHub repo, added Contributions
+
+commit bb555b12222de2f072ee7604e941738b4fc15173
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Thu Nov 12 13:08:12 2020 -0800
+
+    reformatted header file struct declaration to use typedef struct {} struct_name;
+
+commit 0106f19bfb8e52545e70ea0b05102cce4cd1260b
+Merge: 9257cab 0a700d7
+Author: WTsaur <51096598+WTsaur@users.noreply.github.com>
+Date:   Thu Nov 12 13:03:52 2020 -0800
+
+    Merge pull request #2 from WTsaur/Nicks_Branch
+    
+    merge main <- Nicks branch
+
+commit 0a700d7e1227a562965b5da5691b981a9903c706
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Thu Nov 12 16:01:47 2020 -0500
+
+    Cleanup Maintaning Cluster
+
+commit 2d023a6fd272e336d32f458594503ba01de8ce6d
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Thu Nov 12 15:25:49 2020 -0500
+
+    Implment Base CD
+
+commit 9257cab884c4385658a8b0a67db69cfdf85fc242
+Merge: 9eeee3d 54db1af
+Author: WTsaur <51096598+WTsaur@users.noreply.github.com>
+Date:   Thu Nov 12 12:18:38 2020 -0800
+
+    Merge pull request #1 from WTsaur/Nicks_Branch
+    
+    merge main with Nicks_Branch
+
+commit 54db1af51c748b4fe3eb2a289c7508ae1b5a2bf3
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Thu Nov 12 13:06:49 2020 -0500
+
+    Add tokens, to create arguement list
+
+commit faa6964a26476bfb52e7196445ba811f4ab083e6
+Author: Nicholas Tidwell <nicktidwell52@gmail.com>
+Date:   Thu Nov 12 12:03:45 2020 -0500
+
+    Implement LS
+
+commit 9eeee3d176488c16a53c088e94e401dac4de6ffa
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Tue Nov 10 10:52:15 2020 -0800
+
+    Removed unnecessary code/comments. Added struct DIRENTRY for directory data. Updated makefile to reflect additions.
+
+commit 2b929ae6215ae781fe53fe96e1b1dc67dfc7c7b5
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Tue Nov 10 10:38:53 2020 -0800
+
+    Added BPB struct to store BPB data. Finished Info function (should check if info grabbed is correct). Updated makefile to reflect the addition of a header file.
+
+commit 76576712bc677614fe647b670bc96c0713cadf2a
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Sat Nov 7 00:09:59 2020 -0800
+
+    added user interface, FAT file opening, and basic skeletal structure for handling user input
+
+commit 20d4067b5699716edd89e1e0eec649a7e97cb813
+Author: WTsaur <william.tsaur@gmail.com>
+Date:   Fri Nov 6 12:08:52 2020 -0800
+
+    init commit for interpret.c and makefile
+
+commit 8d6435bbbd0261675b9a5a87363de5282af2912e
+Author: WTsaur <51096598+WTsaur@users.noreply.github.com>
+Date:   Tue Nov 3 09:24:53 2020 -0800
+
+    Initial commit
